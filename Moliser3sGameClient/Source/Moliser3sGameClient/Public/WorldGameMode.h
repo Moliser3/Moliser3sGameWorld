@@ -13,5 +13,4 @@ UCLASS()
 class MOLISER3SGAMECLIENT_API AWorldGameMode : public AGameModeBase
 {
     GENERATED_BODY()
-
 };
