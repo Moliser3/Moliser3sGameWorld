@@ -73,3 +73,14 @@ Plugins/**/Intermediate/*
 
 # Cache files for the editor to use
 DerivedDataCache/*
+
+#手动忽略的文件夹---------
+
+Content/FightingAnimsetPro/*
+Content/Frank_RPG_Fighter/*
+Content/MartialArtsFightGame/*
+.idea/
+Content/__ExternalActors__/Map/Lv_AllTEST/D/PW/2CFGGJRPPYO9XC49CKJR1R.uasset
+Plugins/
+.vscode/*
+Moliser3sGameClient.uproject
