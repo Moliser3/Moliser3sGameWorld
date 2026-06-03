@@ -1,0 +1,73 @@
+{
+    "configurations": [
+        {
+            "name": "Win64",
+            "includePath": [
+                "${workspaceFolder}/Source/**",
+                "${workspaceFolder}/Intermediate/Build/Win64/UnrealEditor/Inc/**",
+                "${workspaceFolder}/Intermediate/Build/Win64/UnrealEditor/Inc/Moliser3sGameClient/**",
+                "D:/UE5.1/UE_5.7/Engine/Source/**",
+                "D:/UE5.1/UE_5.7/Engine/Intermediate/Build/Win64/UnrealEditor/Inc/**",
+                "D:/UE5.1/UE_5.7/Engine/Intermediate/Build/Win64/UnrealEditor/Inc/Engine/**",
+                "D:/UE5.1/UE_5.7/Engine/Intermediate/Build/Win64/UnrealEditor/Inc/CoreUObject/**",
+                "D:/UE5.1/UE_5.7/Engine/Source/Runtime/Core/Public/**",
+                "D:/UE5.1/UE_5.7/Engine/Source/Runtime/CoreUObject/Public/**",
+                "D:/UE5.1/UE_5.7/Engine/Source/Runtime/Engine/Public/**",
+                "D:/UE5.1/UE_5.7/Engine/Source/Runtime/Slate/Public/**",
+                "D:/UE5.1/UE_5.7/Engine/Source/Runtime/SlateCore/Public/**",
+                "D:/UE5.1/UE_5.7/Engine/Source/Runtime/InputCore/Public/**",
+                "D:/UE5.1/UE_5.7/Engine/Source/Runtime/UMG/Public/**",
+                "D:/UE5.1/UE_5.7/Engine/Source/Runtime/NavigationSystem/Public/**",
+                "D:/UE5.1/UE_5.7/Engine/Source/Runtime/Net/Core/Public/**",
+                "D:/UE5.1/UE_5.7/Engine/Source/Runtime/Json/Public/**",
+                "D:/UE5.1/UE_5.7/Engine/Source/Runtime/PhysicsCore/Public/**",
+                "D:/UE5.1/UE_5.7/Engine/Source/Runtime/RenderCore/Public/**",
+                "D:/UE5.1/UE_5.7/Engine/Source/Runtime/Renderer/Public/**",
+                "D:/UE5.1/UE_5.7/Engine/Source/Runtime/RHI/Public/**",
+                "D:/UE5.1/UE_5.7/Engine/Source/Runtime/HeadMountedDisplay/Public/**",
+                "D:/UE5.1/UE_5.7/Engine/Source/Runtime/AugmentedReality/Public/**",
+                "D:/UE5.1/UE_5.7/Engine/Source/Runtime/Media/Public/**",
+                "D:/UE5.1/UE_5.7/Engine/Source/Runtime/MediaAssets/Public/**",
+                "D:/UE5.1/UE_5.7/Engine/Source/Developer/**",
+                "D:/UE5.1/UE_5.7/Engine/Source/Editor/**",
+                "D:/UE5.1/UE_5.7/Engine/Plugins/**/Source/**"
+            ],
+            "defines": [
+                "UE_5_0_OR_LATER=1",
+                "UE_5_1_OR_LATER=1",
+                "UE_5_2_OR_LATER=1",
+                "UE_5_3_OR_LATER=1",
+                "UE_5_4_OR_LATER=1",
+                "UE_5_5_OR_LATER=1",
+                "UE_5_6_OR_LATER=1",
+                "UE_5_7_OR_LATER=1",
+                "WITH_EDITOR=1",
+                "WITH_ENGINE=1",
+                "WITH_UNREAL_DEVELOPER_TOOLS=1",
+                "WITH_APPLICATION_CORE=1",
+                "WITH_COREUOBJECT=1",
+                "UE_BUILD_DEVELOPMENT=1",
+                "UE_BUILD_FINAL_RELEASE=0",
+                "PLATFORM_WINDOWS=1",
+                "WIN32=1",
+                "_WIN32_WINNT=0x0601",
+                "WINVER=0x0601",
+                "MOLISER3SGAMECLIENT_API="
+            ],
+            "cStandard": "c17",
+            "cppStandard": "c++20",
+            "intelliSenseMode": "windows-msvc-x64",
+            "compilerPath": "D:/UE5.1/UE_5.7/Engine/Extras/ThirdPartyNotUE/SDKs/HostWin64/Win64/VS2022/2022/Binaries/Hostx64/x64/cl.exe",
+            "browse": {
+                "path": [
+                    "${workspaceFolder}/Source/**",
+                    "${workspaceFolder}/Intermediate/Build/Win64/UnrealEditor/Inc/**",
+                    "D:/UE5.1/UE_5.7/Engine/Source/**",
+                    "D:/UE5.1/UE_5.7/Engine/Intermediate/Build/Win64/UnrealEditor/Inc/**"
+                ],
+                "limitSymbolsToIncludedHeaders": false
+            }
+        }
+    ],
+    "version": 4
+}

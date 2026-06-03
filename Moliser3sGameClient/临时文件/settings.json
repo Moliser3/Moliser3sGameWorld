@@ -1,0 +1,31 @@
+{
+    "ue5.enginePath": "D:\\UE5.1\\UE_5.7",
+    "ue5.defaultBuildConfiguration": "Development",
+    "ue5.defaultPlatform": "Win64",
+    "C_Cpp.intelliSenseEngine": "Tag Parser",
+    "C_Cpp.intelliSenseEngineFallback": "Disabled",
+    "C_Cpp.errorSquiggles": "enabled",
+    "C_Cpp.suggestSnippets": true,
+    "C_Cpp.clang_format_fallbackStyle": "{BasedOnStyle: LLVM, IndentWidth: 4, UseTab: ForIndentation}",
+    "[cpp]": {
+        "editor.defaultFormatter": "ms-vscode.cpptools",
+        "editor.formatOnSave": false
+    },
+    "editor.rulers": [
+        100
+    ],
+    "editor.wordWrap": "off",
+    "files.exclude": {
+        "**/Binaries": true,
+        "**/DerivedDataCache": true,
+        "**/Intermediate": false,
+        "**/.vs": true
+    },
+    "search.exclude": {
+        "**/Binaries": true,
+        "**/DerivedDataCache": true,
+        "**/Intermediate": true,
+        "**/.vs": true,
+        "**/Saved": true
+    }
+}

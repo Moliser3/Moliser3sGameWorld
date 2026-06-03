@@ -1,0 +1,19 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "UE5 Debug",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "D:\\UE5.1\\UE_5.7\\Engine\\Binaries\\Win64\\UnrealEditor.exe",
+            "args": [
+                "${workspaceFolder}\\Moliser3sGameClient.uproject"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "preLaunchTask": "UE5 - Build Development"
+        }
+    ]
+}

@@ -1,0 +1,99 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "UE5 - Generate Project Files",
+            "type": "shell",
+            "command": "D:\\UE5.1\\UE_5.7\\Engine\\Binaries\\DotNET\\UnrealBuildTool\\UnrealBuildTool.exe",
+            "args": [
+                "-projectfiles",
+                "-project=${workspaceFolder}\\Moliser3sGameClient.uproject",
+                "-game",
+                "-engine",
+                "-gencompilecommandsjson"
+            ],
+            "group": "none",
+            "problemMatcher": []
+        },
+        {
+            "label": "UE5 - Build Development",
+            "type": "shell",
+            "command": "D:\\UE5.1\\UE_5.7\\Engine\\Binaries\\DotNET\\UnrealBuildTool\\UnrealBuildTool.exe",
+            "args": [
+                "Moliser3sGameClient",
+                "Win64",
+                "Development",
+                "-project=${workspaceFolder}\\Moliser3sGameClient.uproject"
+            ],
+            "group": "none",
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "UE5 - Build and Launch",
+            "dependsOn": [
+                "UE5 - Build Development"
+            ],
+            "dependsOrder": "sequence",
+            "type": "shell",
+            "command": "D:\\UE5.1\\UE_5.7\\Engine\\Binaries\\Win64\\UnrealEditor.exe",
+            "args": [
+                "${workspaceFolder}\\Moliser3sGameClient.uproject"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "UE5 - Build DebugGame",
+            "type": "shell",
+            "command": "D:\\UE5.1\\UE_5.7\\Engine\\Binaries\\DotNET\\UnrealBuildTool\\UnrealBuildTool.exe",
+            "args": [
+                "Moliser3sGameClient",
+                "Win64",
+                "DebugGame",
+                "-project=${workspaceFolder}\\Moliser3sGameClient.uproject"
+            ],
+            "group": "none",
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "UE5 - Build Shipping",
+            "type": "shell",
+            "command": "D:\\UE5.1\\UE_5.7\\Engine\\Binaries\\DotNET\\UnrealBuildTool\\UnrealBuildTool.exe",
+            "args": [
+                "Moliser3sGameClient",
+                "Win64",
+                "Shipping",
+                "-project=${workspaceFolder}\\Moliser3sGameClient.uproject"
+            ],
+            "group": "none",
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "UE5 - Clean Build",
+            "type": "shell",
+            "command": "D:\\UE5.1\\UE_5.7\\Engine\\Binaries\\DotNET\\UnrealBuildTool\\UnrealBuildTool.exe",
+            "args": [
+                "Moliser3sGameClient",
+                "Win64",
+                "Development",
+                "-clean",
+                "-project=${workspaceFolder}\\Moliser3sGameClient.uproject"
+            ],
+            "group": "none",
+            "problemMatcher": []
+        },
+        {
+            "label": "UE5 - Launch Editor Only",
+            "type": "shell",
+            "command": "D:\\UE5.1\\UE_5.7\\Engine\\Binaries\\Win64\\UnrealEditor.exe",
+            "args": [
+                "${workspaceFolder}\\Moliser3sGameClient.uproject"
+            ],
+            "group": "none",
+            "problemMatcher": []
+        }
+    ]
+}
