@@ -6,24 +6,41 @@
 #include "GameFramework/Character.h"
 #include "BaseCharacter.generated.h"
 
+class UAttributeComponent;
+
 UCLASS(Blueprintable)
 class MOLISER3SGAMECLIENT_API ABaseCharacter : public ACharacter
 {
 	GENERATED_BODY()
 
 public:
-	// Sets default values for this character's properties
 	ABaseCharacter();
 
+	// ===== 移动 =====
+
+	/** 移动角色到指定位置（使用 NavMesh 寻路） */
+	UFUNCTION(BlueprintCallable, Category = "Movement")
+	void MoveToLocation(const FVector& DestLocation);
+
+	/** 停止移动 */
+	UFUNCTION(BlueprintCallable, Category = "Movement")
+	void StopMovement();
+
+	/** 获取当前移动速度（用于动画蓝图） */
+	UFUNCTION(BlueprintPure, Category = "Animation")
+	float GetSpeed() const { return GetVelocity().Length(); }
+
+	// ===== 组件访问 =====
+
+	UFUNCTION(BlueprintPure, Category = "Components")
+	UAttributeComponent* GetAttributeComponent() const { return AttributeComponent; }
+
 protected:
-	// Called when the game starts or when spawned
-	virtual void BeginPlay() override;
+	/** 移动速度 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement")
+	float MoveSpeed = 600.0f;
 
-public:	
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
-
-	// Called to bind functionality to input
-	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
-
+	/** 属性组件 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UAttributeComponent> AttributeComponent;
 };

@@ -85,3 +85,7 @@ Moliser3sGameClient/Plugins/
 #VSCode
 Moliser3sGameClient/.vscode/*
 Moliser3sGameClient/Content/Mode/*
+Moliser3sGameClient/Content/IKRetargeter/**
+
+
+
