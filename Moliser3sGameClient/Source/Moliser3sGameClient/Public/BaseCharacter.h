@@ -6,7 +6,7 @@
 #include "GameFramework/Character.h"
 #include "BaseCharacter.generated.h"
 
-UCLASS()
+UCLASS(Blueprintable)
 class MOLISER3SGAMECLIENT_API ABaseCharacter : public ACharacter
 {
 	GENERATED_BODY()
