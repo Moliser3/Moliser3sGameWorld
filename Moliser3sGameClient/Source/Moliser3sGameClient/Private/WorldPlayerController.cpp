@@ -3,8 +3,12 @@
 
 #include "WorldPlayerController.h"
 #include "Component/Input/ClickDetectionComponent.h"
+#include "Component/Facing/FacingComponent.h"
+#include "Component/Skill/SkillSystemComponent.h"
 #include "EnhancedInputSubsystems.h"
-#include "BaseCharacter.h"
+#include "PlayerCharacter.h"
+#include "EnemyCharacter.h"
+#include "Engine/World.h"
 
 AWorldPlayerController::AWorldPlayerController()
 {
@@ -42,9 +46,13 @@ void AWorldPlayerController::BeginPlay()
 
 void AWorldPlayerController::OnLeftMouseClick()
 {
-    if (ClickDetectionComponent)
+    // 左键释放技能循环队列中的下一个技能（系统内部自行处理 Duration 冷却）
+    if (APlayerCharacter* MyCharacter = Cast<APlayerCharacter>(GetPawn()))
     {
-        ClickDetectionComponent->PerformClick(EClickButton::Left, false);
+        if (USkillSystemComponent* SkillSys = MyCharacter->GetSkillSystem())
+        {
+            SkillSys->ActivateNextSkill();
+        }
     }
 }
 
@@ -58,12 +66,37 @@ void AWorldPlayerController::OnRightMouseClick()
     // 执行点击检测
     FClickHitResult ClickResult = ClickDetectionComponent->DetectMouseClick(false);
 
-    // 只有点击到有效位置时才移动
-    if (ClickResult.bHitSuccess)
+    if (!ClickResult.bHitSuccess)
     {
-        if (ABaseCharacter* MyCharacter = Cast<ABaseCharacter>(GetPawn()))
-        {
-            MyCharacter->MoveToLocation(ClickResult.HitLocation);
-        }
+        return;
     }
+
+    APlayerCharacter* MyCharacter = Cast<APlayerCharacter>(GetPawn());
+    if (!MyCharacter)
+    {
+        return;
+    }
+
+    // 右键点击到敌人 → 进入注视模式并移动到停止距离
+    if (AEnemyCharacter* ClickedEnemy = Cast<AEnemyCharacter>(ClickResult.HitActor.Get()))
+    {
+        if (UFacingComponent* FacingComp = MyCharacter->GetFacingComponent())
+        {
+            // 如果距离大于停止距离，移动到敌人旁边的停止距离位置
+            float Dist = FVector::Dist(MyCharacter->GetActorLocation(), ClickedEnemy->GetActorLocation());
+            float StopDist = MyCharacter->GetStopDistance();
+            if (Dist > StopDist)
+            {
+                FVector DirToEnemy = (ClickedEnemy->GetActorLocation() - MyCharacter->GetActorLocation()).GetSafeNormal2D();
+                FVector MoveDest = ClickedEnemy->GetActorLocation() - DirToEnemy * StopDist;
+                MyCharacter->MoveToLocation(MoveDest);
+            }
+            FacingComp->SetAimTarget(ClickedEnemy);
+        }
+        return;
+    }
+
+    // 右键点击到地面或其他位置 → 移动（保持当前注视模式）
+    // 只有超出最大距离时才由 FacingComponent::Tick 自动切回行走模式
+    MyCharacter->MoveToLocation(ClickResult.HitLocation);
 }

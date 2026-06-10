@@ -2,13 +2,17 @@
 
 
 #include "Component/Attribute/AttributeComponent.h"
+#include "Engine/World.h"
+#include "Engine/Engine.h"
+#include "GameFramework/Pawn.h"
+#include "Kismet/GameplayStatics.h"
 
 UAttributeComponent::UAttributeComponent()
 {
     PrimaryComponentTick.bCanEverTick = false;
 }
 
-void UAttributeComponent::TakeDamage(float DamageAmount)
+void UAttributeComponent::TakeDamage(float DamageAmount, AActor* Instigator)
 {
     if (DamageAmount <= 0.0f)
     {
@@ -21,6 +25,16 @@ void UAttributeComponent::TakeDamage(float DamageAmount)
     if (OldHealth != Health)
     {
         OnHealthChanged.Broadcast(OldHealth, Health);
+    }
+
+    // 在屏幕上输出伤害日志，存在2秒
+    if (GEngine && Instigator)
+    {
+        FString InstigatorName = Instigator->GetName();
+        FString VictimName = GetOwner() ? GetOwner()->GetName() : TEXT("Unknown");
+        FString LogMsg = FString::Printf(TEXT("[Damage] %s -> %s : %.0f damage, %.0f HP remaining"),
+            *InstigatorName, *VictimName, DamageAmount, Health);
+        GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Red, LogMsg);
     }
 }
 
