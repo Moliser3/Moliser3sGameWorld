@@ -19,6 +19,8 @@ class MOLISER3SGAMECLIENT_API UMeleeSlashSkill : public USkillBase
 public:
 	virtual void Execute(AActor* Instigator) override;
 
+	virtual void ApplyDamage(AActor* Instigator) override;
+
 	/** 扇形检测半径（攻击距离，单位：厘米） */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill")
 	float Radius = 100.0f;

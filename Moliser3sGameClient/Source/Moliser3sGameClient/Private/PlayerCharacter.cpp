@@ -26,6 +26,10 @@ APlayerCharacter::APlayerCharacter()
 
 		// 初始速度为奔跑速度
 		MoveComp->MaxWalkSpeed = GetRunSpeed();
+
+		// 跳跃参数
+		MoveComp->JumpZVelocity = 420.0f;
+		MoveComp->AirControl = 0.3f;
 	}
 }
 

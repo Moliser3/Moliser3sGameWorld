@@ -12,6 +12,11 @@ void USkillBase::Execute(AActor* Instigator)
 	// 基类空实现，子类重写
 }
 
+void USkillBase::ApplyDamage(AActor* Instigator)
+{
+	// 基类空实现，子类重写
+}
+
 void USkillBase::PlaySkillMontage(AActor* Instigator)
 {
 	if (!Instigator || !SkillMontage)

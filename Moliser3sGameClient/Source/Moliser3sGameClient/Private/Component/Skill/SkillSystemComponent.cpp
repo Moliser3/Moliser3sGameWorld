@@ -15,47 +15,120 @@ void USkillSystemComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-	// 如果当前有技能正在激活状态，检查 Duration 是否已过期
+	float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+
+	// ── 状态一：ACTIVE — 检测 DamageAt / Duration ──
 	if (bSkillActive && CurrentSkill)
 	{
-		float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
-		if (Now - CurrentSkillStartTime >= CurrentSkill->Duration)
+		float Elapsed = Now - CurrentSkillStartTime;
+
+		// 检测 DamageAt 时间点，触发延迟伤害
+		if (!bDamageApplied && Elapsed >= CurrentSkill->DamageAt)
 		{
-			// 技能持续时间已结束，清空当前技能状态
-			// 注意：不清除 QueueIndex，保留当前位置，等下次 ActivateNextSkill 时才会移动到下一个
+			UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] DamageAt triggered for '%s' (elapsed=%.2f, DamageAt=%.2f)"),
+				*CurrentSkill->SkillName.ToString(), Elapsed, CurrentSkill->DamageAt);
+
+			CurrentSkill->ApplyDamage(GetOwner());
+			bDamageApplied = true;
+		}
+
+		// 检测 Duration 是否到期
+		if (Elapsed >= CurrentSkill->Duration)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] ACTIVE → COMBO_WINDOW  skill='%s'  elapsed=%.2f  duration=%.2f"),
+				*CurrentSkill->SkillName.ToString(), Elapsed, CurrentSkill->Duration);
+
 			CurrentSkill = nullptr;
 			bSkillActive = false;
 			CurrentSkillStartTime = 0.0f;
+			bDamageApplied = false;
+
+			bInComboWindow = true;
+			ComboWindowEndTime = Now + ComboWindowDuration;
+
+			UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] COMBO_WINDOW started  endTime=%.2f  window=%.2fs"),
+				ComboWindowEndTime, ComboWindowDuration);
+		}
+	}
+
+	// ── 状态二：COMBO_WINDOW — 检测窗口是否到期 ──
+	if (bInComboWindow)
+	{
+		if (Now >= ComboWindowEndTime)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] COMBO_WINDOW expired → reset QueueIndex to 0"));
+
+			bInComboWindow = false;
+			ComboWindowEndTime = 0.0f;
+			QueueIndex = 0;
 		}
 	}
 }
 
 void USkillSystemComponent::ActivateNextSkill()
 {
-	// 如果 SkillQueue 为空但 SkillList 有内容，自动用 SkillList 填充队列
+	float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+
+	// ── 第一步：确保队列有内容 ──
 	if (SkillQueue.Num() == 0)
 	{
 		if (SkillList.Num() > 0)
 		{
 			SkillQueue = SkillList;
 			QueueIndex = 0;
-			UE_LOG(LogTemp, Log, TEXT("SkillSystemComponent::ActivateNextSkill — auto-populated SkillQueue from SkillList (%d skills)"), SkillList.Num());
+			UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] auto-populated SkillQueue from SkillList (%d skills)"), SkillList.Num());
 		}
 		else
 		{
-			UE_LOG(LogTemp, Warning, TEXT("SkillSystemComponent::ActivateNextSkill — SkillQueue and SkillList are both empty!"));
+			UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] ActivateNextSkill FAILED — SkillQueue and SkillList are both empty!"));
 			return;
 		}
 	}
 
-	// 如果当前技能还在激活状态，不能释放下一个
-	if (bSkillActive)
+	// ── 第二步：状态检查 ──
+
+	if (bSkillActive && CurrentSkill)
 	{
-		UE_LOG(LogTemp, Verbose, TEXT("SkillSystemComponent::ActivateNextSkill — skill still active, ignored."));
-		return;
+		// ACTIVE 状态：检查是否可打断
+		float Elapsed = Now - CurrentSkillStartTime;
+		if (Elapsed < CurrentSkill->InterruptibleAt)
+		{
+			// 不可打断：忽略本次点击
+			UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] ActivateNextSkill IGNORED — ACTIVE (elapsed=%.2f < InterruptibleAt=%.2f)"),
+				Elapsed, CurrentSkill->InterruptibleAt);
+			return;
+		}
+
+		// 可打断：提前结束当前技能，然后执行下一个
+		UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] ActivateNextSkill INTERRUPT — breaking current skill '%s' (elapsed=%.2f >= InterruptibleAt=%.2f)"),
+			*CurrentSkill->SkillName.ToString(), Elapsed, CurrentSkill->InterruptibleAt);
+
+		// 清理当前技能状态
+		CurrentSkill = nullptr;
+		bSkillActive = false;
+		CurrentSkillStartTime = 0.0f;
+		bDamageApplied = false;
+		bInComboWindow = false;
+		ComboWindowEndTime = 0.0f;
+	}
+	else if (bSkillActive && !CurrentSkill)
+	{
+		// 异常状态：技能激活但没有 CurrentSkill
+		bSkillActive = false;
+	}
+	else if (!bInComboWindow)
+	{
+		// IDLE 状态：从头开始
+		QueueIndex = 0;
+		UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] ActivateNextSkill from IDLE — reset QueueIndex to 0"));
+	}
+	else
+	{
+		// COMBO_WINDOW 状态：继续下一个技能
+		UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] ActivateNextSkill from COMBO_WINDOW — continuing combo at QueueIndex=%d"), QueueIndex);
 	}
 
-	// 确保索引有效
+	// ── 第三步：读取技能 ──
 	if (!SkillQueue.IsValidIndex(QueueIndex))
 	{
 		QueueIndex = 0;
@@ -64,24 +137,30 @@ void USkillSystemComponent::ActivateNextSkill()
 	USkillBase* Skill = SkillQueue[QueueIndex];
 	if (!Skill)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("SkillSystemComponent::ActivateNextSkill — skill at index %d is null, skipping."), QueueIndex);
-		// 当前索引技能无效，尝试移动到下一个
+		UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] ActivateNextSkill FAILED — skill at QueueIndex=%d is null, skipping to next"), QueueIndex);
 		QueueIndex = (QueueIndex + 1) % SkillQueue.Num();
 		return;
 	}
 
-	// 执行技能
+	// ── 第四步：执行技能 ──
 	CurrentSkill = Skill;
-	CurrentSkillStartTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+	CurrentSkillStartTime = Now;
 	bSkillActive = true;
+	bDamageApplied = false;
 
-	UE_LOG(LogTemp, Log, TEXT("SkillSystemComponent::ActivateNextSkill — executing skill '%s' (QueueIndex=%d)"),
-		*Skill->SkillName.ToString(), QueueIndex);
+	// 退出连招窗口（因为进入了 ACTIVE）
+	bInComboWindow = false;
+	ComboWindowEndTime = 0.0f;
+
+	UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] EXECUTING skill='%s'  QueueIndex=%d  Duration=%.2fs  DamageAt=%.2f  InterruptibleAt=%.2f"),
+		*Skill->SkillName.ToString(), QueueIndex, Skill->Duration, Skill->DamageAt, Skill->InterruptibleAt);
 
 	Skill->Execute(GetOwner());
 
-	// 移动到队列中的下一个位置，下次调用 ActivateNextSkill 时释放下一个
+	// ── 第五步：移动到队列下一个位置 ──
 	QueueIndex = (QueueIndex + 1) % SkillQueue.Num();
+
+	UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] advanced to QueueIndex=%d (next skill)"), QueueIndex);
 }
 
 void USkillSystemComponent::AddSkill(USkillBase* NewSkill)
@@ -89,6 +168,8 @@ void USkillSystemComponent::AddSkill(USkillBase* NewSkill)
 	if (NewSkill)
 	{
 		SkillList.Add(NewSkill);
+		UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] added skill '%s' to SkillList (total=%d)"),
+			*NewSkill->SkillName.ToString(), SkillList.Num());
 	}
 }
 
@@ -98,5 +179,10 @@ void USkillSystemComponent::SetSkillQueue(const TArray<USkillBase*>& InQueue)
 	QueueIndex = 0;
 	CurrentSkill = nullptr;
 	bSkillActive = false;
+	bInComboWindow = false;
+	ComboWindowEndTime = 0.0f;
 	CurrentSkillStartTime = 0.0f;
+	bDamageApplied = false;
+
+	UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] SetSkillQueue called — %d skills, QueueIndex=0"), InQueue.Num());
 }

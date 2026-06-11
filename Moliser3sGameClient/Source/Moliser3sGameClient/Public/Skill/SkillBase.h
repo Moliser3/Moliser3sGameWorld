@@ -10,9 +10,11 @@ class UAnimMontage;
 
 /**
  * 技能基类
- * 所有技能继承此类，重写 Execute 实现具体逻辑
- * Duration 控制技能的持续时间，技能系统根据此值判断技能何时释放完成
- * SkillMontage / MontageSlotName 控制技能播放的动画蒙太奇
+ * 所有技能继承此类，重写 Execute 和 ApplyDamage 实现具体逻辑
+ *
+ * Duration: 技能持续总时长
+ * DamageAt: 伤害触发的时间点（动画的"命中帧"）
+ * InterruptibleAt: 可打断时间点，超过此点可以提前释放下一个技能
  */
 UCLASS(Blueprintable, DefaultToInstanced, EditInlineNew)
 class MOLISER3SGAMECLIENT_API USkillBase : public UObject
@@ -20,9 +22,17 @@ class MOLISER3SGAMECLIENT_API USkillBase : public UObject
 	GENERATED_BODY()
 
 public:
-	/** 执行技能 */
+	/** 执行技能（播放蒙太奇、设置参数等） */
 	UFUNCTION(BlueprintCallable, Category = "Skill")
 	virtual void Execute(AActor* Instigator);
+
+	/**
+	 * 延迟应用伤害
+	 * 在 DamageAt 时间点由 SkillSystemComponent 调用
+	 * 子类在此方法中实现伤害逻辑
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Skill")
+	virtual void ApplyDamage(AActor* Instigator);
 
 	/**
 	 * 在施法者身上播放技能蒙太奇
@@ -38,6 +48,14 @@ public:
 	/** 技能持续时间（秒），释放后经过此时间才算完成 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill", meta = (ClampMin = "0.0"))
 	float Duration = 1.0f;
+
+	/** 伤害触发时间（秒），从技能开始到实际造成伤害的延迟 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill", meta = (ClampMin = "0.0"))
+	float DamageAt = 0.3f;
+
+	/** 可打断时间（秒），超过此时间后可以提前释放下一个技能，0=全程不可打断 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill", meta = (ClampMin = "0.0"))
+	float InterruptibleAt = 0.5f;
 
 	/** 技能蒙太奇（动画） */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill|Animation")

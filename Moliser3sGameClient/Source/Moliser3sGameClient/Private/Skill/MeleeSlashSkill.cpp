@@ -6,7 +6,6 @@
 #include "GameFramework/Controller.h"
 #include "Engine/OverlapResult.h"
 #include "Engine/World.h"
-#include "DrawDebugHelpers.h"
 
 void UMeleeSlashSkill::Execute(AActor* Instigator)
 {
@@ -29,6 +28,20 @@ void UMeleeSlashSkill::Execute(AActor* Instigator)
 
 	// 播放技能蒙太奇（如果已配置）
 	PlaySkillMontage(Instigator);
+}
+
+void UMeleeSlashSkill::ApplyDamage(AActor* Instigator)
+{
+	if (!Instigator)
+	{
+		return;
+	}
+
+	ACharacter* OwnerChar = Cast<ACharacter>(Instigator);
+	if (!OwnerChar)
+	{
+		return;
+	}
 
 	FVector Origin = OwnerChar->GetActorLocation();
 	FVector Forward = OwnerChar->GetActorForwardVector();
@@ -48,9 +61,6 @@ void UMeleeSlashSkill::Execute(AActor* Instigator)
 		Sphere,
 		QueryParams
 	);
-
-	// 调试：绘制扇形范围
-	DrawDebugSphere(Instigator->GetWorld(), Origin, Radius, 24, FColor::Green, false, 0.5f);
 
 	float HalfAngleRad = FMath::DegreesToRadians(HalfAngleDeg);
 
@@ -99,9 +109,6 @@ void UMeleeSlashSkill::Execute(AActor* Instigator)
 		{
 			// 记录已命中，防止重复伤害
 			DamagedActors.Add(HitActor);
-
-			// 调试线：指向被命中的敌人
-			DrawDebugLine(Instigator->GetWorld(), Origin, Enemy->GetActorLocation(), FColor::Red, false, 0.5f);
 
 			// 用技能基础伤害走完整伤害计算链
 			if (Enemy->GetAttributeComponent())

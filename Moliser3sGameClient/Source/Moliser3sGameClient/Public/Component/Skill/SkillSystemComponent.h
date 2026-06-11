@@ -48,6 +48,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Skill")
 	bool IsSkillActive() const { return bSkillActive; }
 
+	/** 连招窗口持续时间（秒），默认可在蓝图中配置 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Combo", meta = (ClampMin = "0.0"))
+	float ComboWindowDuration = 0.5f;
+
 protected:
 	/** 从编辑器中配置的所有技能（蓝图可直接在此数组中配置实例） */
 	UPROPERTY(EditDefaultsOnly, Instanced, Category = "Skills")
@@ -70,4 +74,13 @@ protected:
 
 	/** 技能是否正处于激活状态（Duration 倒计时中） */
 	bool bSkillActive = false;
+
+	/** 是否处于连招缓冲期 */
+	bool bInComboWindow = false;
+
+	/** 连招窗口结束时间戳 */
+	float ComboWindowEndTime = 0.0f;
+
+	/** 当前技能的伤害是否已应用（用于 DamageAt 延迟触发） */
+	bool bDamageApplied = false;
 };
