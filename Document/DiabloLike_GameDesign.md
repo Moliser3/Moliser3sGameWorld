@@ -41,7 +41,14 @@
 - 右键点击地面设置目标位置，跳跃到目标（抛物线位移）
 - 目标不可达时原地起跳
 - 飞行中撞到障碍物则落地
-- 参数：JumpRange=500, JumpHeight=200, FlyDuration=0.6
+
+**两阶段设计：**
+  - **阶段1（0 ~ FlyDuration=0.72s）**：抛物线位移，由 SkillSystemComponent 的 Tick 驱动
+  - **阶段2（FlyDuration ~ Duration=2.07s）**：落地收尾动画，角色不再移动
+
+**打断规则：** `InterruptibleAt = 0.72`，飞行中不可打断，收尾期可打断
+
+**参数：** JumpRange=500, JumpHeight=200, FlyDuration=0.72, Duration=2.07
 
 ---
 

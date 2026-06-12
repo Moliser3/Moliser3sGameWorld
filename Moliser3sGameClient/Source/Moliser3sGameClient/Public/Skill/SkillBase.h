@@ -27,6 +27,22 @@ public:
 	virtual void Execute(AActor* Instigator);
 
 	/**
+	 * 每帧更新技能（由 SkillSystemComponent::TickComponent 调用）
+	 * 子类在此方法中实现持续性技能逻辑（如跳跃抛物线更新）
+	 * 基类空实现
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Skill")
+	virtual void Update(AActor* Instigator, float DeltaTime);
+
+	/**
+	 * 技能被打断时调用（由 SkillSystemComponent 在打断时调用）
+	 * 子类在此方法中清理自己的运行时状态（如跳跃的 bIsJumping）
+	 * 基类空实现
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Skill")
+	virtual void OnInterrupt(AActor* Instigator);
+
+	/**
 	 * 延迟应用伤害
 	 * 在 DamageAt 时间点由 SkillSystemComponent 调用
 	 * 子类在此方法中实现伤害逻辑

@@ -6,9 +6,25 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/Controller.h"
 #include "WorldPlayerController.h"
+#include "Component/Skill/SkillSystemComponent.h"
+#include "Component/Facing/FacingComponent.h"
+#include "Component/Camera/CameraControllerComponent.h"
 #include "NavigationSystem.h"
 #include "Engine/World.h"
 #include "DrawDebugHelpers.h"
+
+UJumpSkill::UJumpSkill()
+{
+	// 跳跃是移动技能，不受攻击距离/敌人判断约束
+	bIsMovementSkill = true;
+
+	// 两阶段跳跃：0.72s 抛物线 + 收尾
+	Duration = 2.07f;
+	DamageAt = 0.0f; // 跳跃不造成伤害
+	InterruptibleAt = 0.72f; // 飞行中不可打断，落地收尾阶段可打断
+	MaxAttackRange = -1; // 跳跃不受攻击距离限制
+	FlyDuration = 0.72f;
+}
 
 void UJumpSkill::Execute(AActor* Instigator)
 {
@@ -23,9 +39,13 @@ void UJumpSkill::Execute(AActor* Instigator)
 		return;
 	}
 
-	// 如果角色正在跳跃中或在空中，不重复触发
-	if (bIsJumping || (OwnerChar->GetCharacterMovement() && OwnerChar->GetCharacterMovement()->IsFalling()))
+	// 如果正在跳跃中，不重复触发
+	if (bIsJumping)
 	{
+		if (USkillSystemComponent* SkillSys = OwnerChar->FindComponentByClass<USkillSystemComponent>())
+		{
+			SkillSys->ForceEndCurrentSkill();
+		}
 		return;
 	}
 
@@ -59,18 +79,23 @@ void UJumpSkill::Execute(AActor* Instigator)
 
 	// 检测目标是否可达（NavMesh）
 	FVector FinalTarget = Target2D;
-	FinalTarget.Z = ClickTarget.Z; // 保留原始高度
+	FinalTarget.Z = ClickTarget.Z;
+
+	// 同步更新 Controller 的 LastClickTarget 为实际跳跃目标位置
+	if (PlayerCtl)
+	{
+		PlayerCtl->SetLastClickTarget(FinalTarget);
+	}
 
 	if (!IsTargetReachable(Instigator, FinalTarget))
 	{
-		// 不可达 → 原地起跳（目标 = 起点，仅垂直抛物线）
+		// 不可达 → 原地起跳
 		JumpTargetLoc = JumpStartLoc;
 		UE_LOG(LogTemp, Warning, TEXT("[JumpSkill] Target unreachable, jumping in place"));
 	}
 	else
 	{
 		JumpTargetLoc = FinalTarget;
-		// 朝向目标方向
 		FVector DirToTarget = (JumpTargetLoc - JumpStartLoc).GetSafeNormal2D();
 		if (!DirToTarget.IsNearlyZero())
 		{
@@ -85,21 +110,49 @@ void UJumpSkill::Execute(AActor* Instigator)
 		Ctl->StopMovement();
 	}
 
-	// 播放跳跃蒙太奇（如果已配置）
+	// 通知摄像机控制器：跳跃开始
+	if (PlayerCtl)
+	{
+		if (UCameraControllerComponent* CamCtrl = PlayerCtl->GetCameraController())
+		{
+			CamCtrl->SetJumping(true);
+		}
+	}
+
+	// 播放跳跃蒙太奇
 	PlaySkillMontage(Instigator);
+
+	// ── Debug：绘制跳跃路径预览线框 ──
+	if (Instigator && Instigator->GetWorld())
+	{
+		UWorld* World = Instigator->GetWorld();
+		const int32 NumSamples = 20;
+		FVector PrevPoint = JumpStartLoc;
+		PrevPoint.Z = JumpStartLoc.Z; // 水平位置
+		for (int32 i = 1; i <= NumSamples; i++)
+		{
+			float T = (float)i / NumSamples;
+			FVector HPos = FMath::Lerp(JumpStartLoc, JumpTargetLoc, T);
+			HPos.Z = JumpStartLoc.Z;
+			float VOffset = 4.0f * JumpHeight * T * (1.0f - T);
+			FVector Point = HPos;
+			Point.Z += VOffset;
+
+			DrawDebugLine(World, PrevPoint, Point, FColor::Green, false, FlyDuration, 0, 1.0f);
+			DrawDebugPoint(World, Point, 4.0f, FColor::Green, false, FlyDuration);
+			PrevPoint = Point;
+		}
+		// 起点和终点标记
+		DrawDebugSphere(World, JumpStartLoc, 15.0f, 8, FColor::Blue, false, FlyDuration);
+		DrawDebugSphere(World, JumpTargetLoc, 15.0f, 8, FColor::Red, false, FlyDuration);
+	}
 
 	// 初始化跳跃状态
 	bIsJumping = true;
 	JumpProgress = 0.0f;
-
-	// 设置 Timer 驱动跳跃（每 0.016s ≈ 60fps）
-	float TickInterval = 0.016f;
-	Instigator->GetWorld()->GetTimerManager().SetTimer(JumpTimerHandle, 
-		FTimerDelegate::CreateUObject(this, &UJumpSkill::OnJumpTick, Instigator),
-		TickInterval, true);
 }
 
-void UJumpSkill::OnJumpTick(AActor* Instigator)
+void UJumpSkill::Update(AActor* Instigator, float DeltaTime)
 {
 	if (!Instigator || !bIsJumping)
 	{
@@ -113,54 +166,103 @@ void UJumpSkill::OnJumpTick(AActor* Instigator)
 		return;
 	}
 
-	// 推进进度
-	float DeltaTime = 0.016f; // 匹配 Timer 间隔
-	JumpProgress += DeltaTime / FlyDuration;
-
-	// 限制进度不超过 1.0
-	if (JumpProgress > 1.0f)
+	// ── 阶段1：抛物线位移（0 ~ FlyDuration）──
+	if (JumpProgress < 1.0f)
 	{
-		JumpProgress = 1.0f;
+		// 推进跳跃进度（使用引擎帧 DeltaTime，与渲染帧完全同步）
+		JumpProgress += DeltaTime / FlyDuration;
+
+		// 限制进度不超过 1.0
+		if (JumpProgress > 1.0f)
+		{
+			JumpProgress = 1.0f;
+		}
+
+		// 计算水平位置（线性插值）
+		FVector HorizontalPos = FMath::Lerp(JumpStartLoc, JumpTargetLoc, JumpProgress);
+		HorizontalPos.Z = JumpStartLoc.Z;
+
+		// 计算垂直偏移：抛物线公式 4 * h * t * (1-t)
+		float VerticalOffset = 4.0f * JumpHeight * JumpProgress * (1.0f - JumpProgress);
+
+		FVector NewLocation = HorizontalPos;
+		NewLocation.Z += VerticalOffset;
+
+		// 碰撞检测
+		FCollisionQueryParams QueryParams;
+		QueryParams.AddIgnoredActor(Instigator);
+
+		FCollisionShape CheckShape = FCollisionShape::MakeSphere(30.0f);
+		bool bBlocked = Instigator->GetWorld()->OverlapBlockingTestByChannel(
+			NewLocation,
+			FQuat::Identity,
+			ECC_WorldStatic,
+			CheckShape,
+			QueryParams
+		);
+
+		if (bBlocked)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[JumpSkill] Hit obstacle, landing early"));
+			JumpProgress = 1.0f;
+			// 不 EndJump，继续进入阶段2收尾
+			OwnerChar->SetActorLocation(NewLocation, false, nullptr, ETeleportType::TeleportPhysics);
+			return;
+		}
+
+		// 设置角色位置
+		OwnerChar->SetActorLocation(NewLocation, false, nullptr, ETeleportType::TeleportPhysics);
 	}
 
-	// 计算水平位置（线性插值）
-	FVector HorizontalPos = FMath::Lerp(JumpStartLoc, JumpTargetLoc, JumpProgress);
-	HorizontalPos.Z = JumpStartLoc.Z; // 水平位置保持起点高度
-
-	// 计算垂直偏移：抛物线公式 4 * h * t * (1-t)
-	float VerticalOffset = 4.0f * JumpHeight * JumpProgress * (1.0f - JumpProgress);
-
-	FVector NewLocation = HorizontalPos;
-	NewLocation.Z += VerticalOffset;
-
-	// 碰撞检测：检查新位置是否有阻挡
-	FCollisionQueryParams QueryParams;
-	QueryParams.AddIgnoredActor(Instigator);
-
-	FCollisionShape CheckShape = FCollisionShape::MakeSphere(30.0f); // 角色半径
-	bool bBlocked = Instigator->GetWorld()->OverlapBlockingTestByChannel(
-		NewLocation,
-		FQuat::Identity,
-		ECC_WorldStatic,
-		CheckShape,
-		QueryParams
-	);
-
-	if (bBlocked)
+	// ── 阶段2：落地收尾（FlyDuration ~ Duration）──
+	// 抛物线位移已完成，角色不再移动
+	// 不清除技能状态，让 SkillSystemComponent 的 Duration 检测自然到期进入 COMBO_WINDOW
+	// 这样收尾动画可以完整播放
+	if (JumpProgress >= 1.0f && bIsJumping)
 	{
-		// 撞到障碍物 → 落地
-		UE_LOG(LogTemp, Warning, TEXT("[JumpSkill] Hit obstacle, landing"));
-		EndJump(Instigator);
-		return;
+		bIsJumping = false;
+
+		// 通知摄像机控制器：跳跃位移结束，恢复 Z 弹性
+		if (AController* Ctl = OwnerChar->GetController())
+		{
+			if (AWorldPlayerController* PlayerCtl = Cast<AWorldPlayerController>(Ctl))
+			{
+				if (UCameraControllerComponent* CamCtrl = PlayerCtl->GetCameraController())
+				{
+					CamCtrl->SetJumping(false);
+				}
+			}
+		}
+
+		UE_LOG(LogTemp, Warning, TEXT("[JumpSkill] Movement finished, waiting for Duration (%.2f) to expire for landing anim"), Duration);
+	}
+}
+
+void UJumpSkill::OnInterrupt(AActor* Instigator)
+{
+	// 跳跃被打断时清理运行时状态
+	// （打断仅在落地收尾阶段的 ActivateNextSkill 中触发，飞行中 InterruptibleAt=0.72 不可打断）
+	if (bIsJumping)
+	{
+		bIsJumping = false;
+		JumpProgress = 0.0f;
+
+		UE_LOG(LogTemp, Warning, TEXT("[JumpSkill] Interrupted!"));
 	}
 
-	// 设置角色位置
-	OwnerChar->SetActorLocation(NewLocation, false, nullptr, ETeleportType::TeleportPhysics);
-
-	// 到达终点
-	if (JumpProgress >= 1.0f)
+	// 通知摄像机控制器：跳跃结束
+	if (ACharacter* OwnerChar = Cast<ACharacter>(Instigator))
 	{
-		EndJump(Instigator);
+		if (AController* Ctl = OwnerChar->GetController())
+		{
+			if (AWorldPlayerController* PlayerCtl = Cast<AWorldPlayerController>(Ctl))
+			{
+				if (UCameraControllerComponent* CamCtrl = PlayerCtl->GetCameraController())
+				{
+					CamCtrl->SetJumping(false);
+				}
+			}
+		}
 	}
 }
 
@@ -174,10 +276,34 @@ void UJumpSkill::EndJump(AActor* Instigator)
 	bIsJumping = false;
 	JumpProgress = 0.0f;
 
-	// 停止 Timer
-	if (Instigator && Instigator->GetWorld())
+	if (ACharacter* OwnerChar = Cast<ACharacter>(Instigator))
 	{
-		Instigator->GetWorld()->GetTimerManager().ClearTimer(JumpTimerHandle);
+		if (USkillSystemComponent* SkillSys = OwnerChar->FindComponentByClass<USkillSystemComponent>())
+		{
+			SkillSys->ForceEndCurrentSkill();
+		}
+
+		// 通知摄像机控制器：跳跃结束
+		if (AController* Ctl = OwnerChar->GetController())
+		{
+			if (AWorldPlayerController* PlayerCtl = Cast<AWorldPlayerController>(Ctl))
+			{
+				if (UCameraControllerComponent* CamCtrl = PlayerCtl->GetCameraController())
+				{
+					CamCtrl->SetJumping(false);
+				}
+			}
+		}
+
+		// 停止移动 + 清零速度
+		if (AController* Ctl = OwnerChar->GetController())
+		{
+			Ctl->StopMovement();
+		}
+		if (UCharacterMovementComponent* MoveComp = OwnerChar->GetCharacterMovement())
+		{
+			MoveComp->Velocity = FVector::ZeroVector;
+		}
 	}
 
 	UE_LOG(LogTemp, Warning, TEXT("[JumpSkill] Jump ended"));
@@ -190,16 +316,14 @@ bool UJumpSkill::IsTargetReachable(AActor* Instigator, const FVector& Target) co
 		return false;
 	}
 
-	// 使用 NavigationSystem 检测目标点是否在 NavMesh 上
 	UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(Instigator->GetWorld());
 	if (!NavSys)
 	{
-		// 没有导航系统则默认可达
 		return true;
 	}
 
 	FNavLocation NavLocation;
-	bool bReachable = NavSys->ProjectPointToNavigation(Target, NavLocation, FVector(50.0f));
+	bool bReachable = NavSys->ProjectPointToNavigation(Target, NavLocation, FVector(200.0f));
 
 	return bReachable;
 }

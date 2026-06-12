@@ -3,6 +3,7 @@
 
 #include "WorldPlayerController.h"
 #include "Component/Input/ClickDetectionComponent.h"
+#include "Component/Camera/CameraControllerComponent.h"
 #include "Component/Facing/FacingComponent.h"
 #include "Component/Skill/SkillSystemComponent.h"
 #include "Skill/SkillBase.h"
@@ -24,6 +25,9 @@ AWorldPlayerController::AWorldPlayerController()
 
     // 创建点击检测组件
     ClickDetectionComponent = CreateDefaultSubobject<UClickDetectionComponent>(TEXT("ClickDetectionComponent"));
+
+    // 创建摄像机控制器组件
+    CameraControllerComponent = CreateDefaultSubobject<UCameraControllerComponent>(TEXT("CameraControllerComponent"));
 
     // 开启 Tick 以检测自动攻击
     PrimaryActorTick.bCanEverTick = true;
@@ -117,77 +121,90 @@ void AWorldPlayerController::OnRightMouseClick()
 		return;
 	}
 
-	// 执行点击检测
-	FClickHitResult ClickResult = ClickDetectionComponent->DetectMouseClick(false);
-
-	if (!ClickResult.bHitSuccess)
-	{
-		return;
-	}
-
 	APlayerCharacter* MyCharacter = Cast<APlayerCharacter>(GetPawn());
 	if (!MyCharacter)
 	{
 		return;
 	}
 
-	// 存储点击位置（供技能系统使用，如跳跃技能读取此位置作为目标）
+	USkillSystemComponent* SkillSys = MyCharacter->GetSkillSystem();
+
+	// ── 跳跃飞行阶段拦截 ──
+	// 移动技能在不可打断阶段（飞行中），忽略所有输入
+	if (SkillSys && SkillSys->IsSkillActive())
+	{
+		USkillBase* CurSkill = SkillSys->GetCurrentSkill();
+		if (CurSkill && CurSkill->bIsMovementSkill)
+		{
+			float Elapsed = SkillSys->GetCurrentSkillElapsed();
+			if (Elapsed >= 0.0f && Elapsed < CurSkill->InterruptibleAt)
+			{
+				UE_LOG(LogTemp, Warning, TEXT("[WorldPC] Input ignored — jump flight phase (%.2f < InterruptibleAt=%.2f)"),
+					Elapsed, CurSkill->InterruptibleAt);
+				bPendingAttack = false;
+				return;
+			}
+			// 收尾阶段（可打断）：放行
+		}
+	}
+
+	// 执行点击检测
+	FClickHitResult ClickResult = ClickDetectionComponent->DetectMouseClick(false);
+	if (!ClickResult.bHitSuccess)
+	{
+		return;
+	}
+
+	// 存储点击位置（供跳跃技能读取目标位置）
 	LastClickTarget = ClickResult.HitLocation;
 
-	// ── 第一步：检查下一个技能是否为移动技能（如跳跃） ──
-	// 移动技能不受攻击距离/敌人判断约束，点击即触发
-	USkillSystemComponent* SkillSys = MyCharacter->GetSkillSystem();
-	if (SkillSys && SkillSys->IsNextSkillMovement())
+	// ── 统一处理：先执行技能队列的下一个技能 ──
+	// 跳跃就是技能，不应该特殊判断。
+	// ActivateNextSkill 内部会处理：
+	//   1. 收尾阶段打断当前技能 → 执行队列中的下一个（跳跃/出拳）
+	//   2. IDLE 状态 → 从队列头部执行
+	//   3. 飞行阶段不可打断 → 忽略
+	//   4. 队列空 → 自动填充
+	if (SkillSys)
 	{
+		// 如果是点击敌人且 MaxAttackRange > 0 且距离超远时，需要先移动到攻击距离
+		// 否则直接执行技能
+		AEnemyCharacter* ClickedEnemy = Cast<AEnemyCharacter>(ClickResult.HitActor.Get());
+		if (ClickedEnemy)
+		{
+			float Dist = FVector::Dist(MyCharacter->GetActorLocation(), ClickedEnemy->GetActorLocation());
+			float MaxRange = SkillSys->GetMaxAttackRange();
+
+			if (MaxRange > 0 && Dist > MaxRange && !SkillSys->IsNextSkillMovement())
+			{
+				// 远距敌人 + 下一个技能不是移动技能 → 移动到攻击距离
+				FVector DirToEnemy = (ClickedEnemy->GetActorLocation() - MyCharacter->GetActorLocation()).GetSafeNormal2D();
+				FVector MoveDest = ClickedEnemy->GetActorLocation() - DirToEnemy * MaxRange;
+				MyCharacter->MoveToLocation(MoveDest);
+
+				if (UFacingComponent* FacingComp = MyCharacter->GetFacingComponent())
+				{
+					FacingComp->SetAimTarget(ClickedEnemy);
+				}
+				bPendingAttack = true;
+				PendingMaxRange = MaxRange;
+				return;
+			}
+
+			// 近距敌人或下一个技能是移动技能 — 设置注视后执行技能
+			if (UFacingComponent* FacingComp = MyCharacter->GetFacingComponent())
+			{
+				FacingComp->SetAimTarget(ClickedEnemy);
+			}
+			LastClickTarget = ClickedEnemy->GetActorLocation();
+		}
+
+		// 执行下一个技能（打断/IDLE/COMBO 都能处理）
+		bPendingAttack = false;
 		SkillSys->ActivateNextSkill();
 		return;
 	}
 
-	// ── 第二步：非移动技能 → 原有攻击/移动逻辑 ──
-
-	// 右键点击到敌人
-	if (AEnemyCharacter* ClickedEnemy = Cast<AEnemyCharacter>(ClickResult.HitActor.Get()))
-	{
-		float Dist = FVector::Dist(MyCharacter->GetActorLocation(), ClickedEnemy->GetActorLocation());
-
-		// 获取技能队列的 MaxAttackRange，-1 表示全远程技能
-		float MaxRange = SkillSys ? SkillSys->GetMaxAttackRange() : -1.0f;
-
-		if (MaxRange > 0 && Dist <= MaxRange)
-		{
-			// 距离 ≤ 最大攻击距离 → 直接攻击（内部打断逻辑由 ActivateNextSkill 处理）
-			if (SkillSys)
-			{
-				SkillSys->ActivateNextSkill();
-			}
-		}
-		else if (MaxRange > 0)
-		{
-			// 距离 > 最大攻击距离 → 移动到最大攻击距离处 + 进入注视模式
-			if (UFacingComponent* FacingComp = MyCharacter->GetFacingComponent())
-			{
-				FVector DirToEnemy = (ClickedEnemy->GetActorLocation() - MyCharacter->GetActorLocation()).GetSafeNormal2D();
-				FVector MoveDest = ClickedEnemy->GetActorLocation() - DirToEnemy * MaxRange;
-				MyCharacter->MoveToLocation(MoveDest);
-				FacingComp->SetAimTarget(ClickedEnemy);
-
-				// 设置待攻击标记：走到攻击距离后自动释放技能
-				bPendingAttack = true;
-				PendingMaxRange = MaxRange;
-				UE_LOG(LogTemp, Warning, TEXT("[AutoAttack] Moving to attack range, Dist=%.0f MaxRange=%.0f"), Dist, MaxRange);
-			}
-		}
-		else
-		{
-			// MaxAttackRange = -1（全远程技能）→ 直接攻击（内部打断逻辑由 ActivateNextSkill 处理）
-			if (SkillSys)
-			{
-				SkillSys->ActivateNextSkill();
-			}
-		}
-		return;
-	}
-
-	// 右键点击到地面或其他位置 → 移动（保持当前注视模式）
+	// 没有技能系统 → 直接移动
 	MyCharacter->MoveToLocation(ClickResult.HitLocation);
 }

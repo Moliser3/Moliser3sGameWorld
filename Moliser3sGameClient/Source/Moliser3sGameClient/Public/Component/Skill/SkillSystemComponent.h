@@ -52,6 +52,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Skill")
 	float GetMaxAttackRange() const;
 
+	/** 获取当前正在执行的技能（nullptr 表示空闲） */
+	UFUNCTION(BlueprintPure, Category = "Skill")
+	USkillBase* GetCurrentSkill() const { return CurrentSkill; }
+
 	/** 预览队列中的下一个技能（不执行），用于判断技能类型 */
 	UFUNCTION(BlueprintPure, Category = "Skill")
 	USkillBase* PeekNextSkill() const;
@@ -59,6 +63,18 @@ public:
 	/** 下一个技能是否为移动技能（如跳跃） */
 	UFUNCTION(BlueprintPure, Category = "Skill")
 	bool IsNextSkillMovement() const;
+
+	/** 获取当前技能已运行的时间（秒），用于判断是否超过 InterruptibleAt */
+	UFUNCTION(BlueprintPure, Category = "Skill")
+	float GetCurrentSkillElapsed() const;
+
+	/** 尝试打断当前技能（如果 elapsed ≥ InterruptibleAt），不执行下一个技能 */
+	UFUNCTION(BlueprintCallable, Category = "Skill")
+	void TryInterruptCurrentSkill();
+
+	/** 强制结束当前技能，进入连招窗口（供跳跃等自行管理结束时机的技能使用） */
+	UFUNCTION(BlueprintCallable, Category = "Skill")
+	void ForceEndCurrentSkill();
 
 	/** 连招窗口持续时间（秒），默认可在蓝图中配置 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Combo", meta = (ClampMin = "0.0"))

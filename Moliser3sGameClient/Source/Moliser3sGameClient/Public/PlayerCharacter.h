@@ -8,6 +8,7 @@
 
 class UFacingComponent;
 class USkillSystemComponent;
+class UCameraComponent;
 
 /**
  * 玩家角色类
@@ -32,6 +33,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Components")
 	USkillSystemComponent* GetSkillSystem() const { return SkillSystemComponent; }
 
+	/** 获取相机组件 */
+	UFUNCTION(BlueprintPure, Category = "Components")
+	UCameraComponent* GetCamera() const { return CameraComponent; }
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -46,4 +51,8 @@ protected:
 	/** 技能系统组件 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<USkillSystemComponent> SkillSystemComponent;
+
+	/** 相机组件（由 CameraControllerComponent 控制） */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera")
+	TObjectPtr<UCameraComponent> CameraComponent;
 };

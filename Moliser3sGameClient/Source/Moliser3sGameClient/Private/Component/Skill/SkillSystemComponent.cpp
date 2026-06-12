@@ -49,6 +49,16 @@ void USkillSystemComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 			UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] COMBO_WINDOW started  endTime=%.2f  window=%.2fs"),
 				ComboWindowEndTime, ComboWindowDuration);
 		}
+		else
+		{
+			// 每帧更新当前技能（如跳跃抛物线位移、持续性技能等）
+			// 放在 Duration 检测之后，避免 Update 中 EndJump 导致 CurrentSkill 置空后
+			// 继续访问 CurrentSkill 造成崩溃
+			if (bSkillActive && CurrentSkill)
+			{
+				CurrentSkill->Update(GetOwner(), DeltaTime);
+			}
+		}
 	}
 
 	// ── 状态二：COMBO_WINDOW — 检测窗口是否到期 ──
@@ -107,6 +117,9 @@ void USkillSystemComponent::ActivateNextSkill()
 		// 可打断：提前结束当前技能，然后执行下一个
 		UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] ActivateNextSkill INTERRUPT — cancelling current skill, executing next"));
 
+		// 通知当前技能：被打断了（让技能清理运行时状态，如跳跃的 bIsJumping）
+		CurrentSkill->OnInterrupt(GetOwner());
+
 		// 清理当前技能状态
 		CurrentSkill = nullptr;
 		bSkillActive = false;
@@ -121,6 +134,9 @@ void USkillSystemComponent::ActivateNextSkill()
 		{
 			QueueIndex = 0;
 		}
+
+		// 打断后直接跳到执行阶段，不经过下面的状态检查（防止 IDLE 分支重置 QueueIndex=0）
+		goto ExecuteSkill;
 	}
 	else if (bSkillActive && !CurrentSkill)
 	{
@@ -129,9 +145,9 @@ void USkillSystemComponent::ActivateNextSkill()
 	}
 	else if (!bInComboWindow)
 	{
-		// IDLE 状态：从头开始
-		QueueIndex = 0;
-		UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] ActivateNextSkill from IDLE — reset QueueIndex to 0"));
+		// IDLE 状态：保留当前 QueueIndex，使用队列中的下一个技能
+		// 注意：不重置 QueueIndex=0，否则打断跳跃收尾后无法执行跳跃后的下一个技能
+		UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] ActivateNextSkill from IDLE — QueueIndex=%d"), QueueIndex);
 	}
 	else
 	{
@@ -139,6 +155,7 @@ void USkillSystemComponent::ActivateNextSkill()
 		UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] ActivateNextSkill from COMBO_WINDOW — continuing combo at QueueIndex=%d"), QueueIndex);
 	}
 
+ExecuteSkill:
 	// ── 第三步：读取技能 ──
 	if (!SkillQueue.IsValidIndex(QueueIndex))
 	{
@@ -182,6 +199,16 @@ void USkillSystemComponent::AddSkill(USkillBase* NewSkill)
 		UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] added skill '%s' to SkillList (total=%d)"),
 			*NewSkill->SkillName.ToString(), SkillList.Num());
 	}
+}
+
+float USkillSystemComponent::GetCurrentSkillElapsed() const
+{
+	if (!bSkillActive || !CurrentSkill)
+	{
+		return -1.0f;
+	}
+	float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+	return Now - CurrentSkillStartTime;
 }
 
 float USkillSystemComponent::GetMaxAttackRange() const
@@ -238,6 +265,62 @@ USkillBase* USkillSystemComponent::PeekNextSkill() const
 
 	USkillBase* Skill = (*ActiveQueue)[Index];
 	return Skill;
+}
+
+void USkillSystemComponent::TryInterruptCurrentSkill()
+{
+	if (!bSkillActive || !CurrentSkill)
+	{
+		return;
+	}
+
+	float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+	float Elapsed = Now - CurrentSkillStartTime;
+
+	// 检查是否可打断
+	if (Elapsed < CurrentSkill->InterruptibleAt)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] TryInterrupt — IGNORED (elapsed=%.2f < InterruptibleAt=%.2f)"),
+			Elapsed, CurrentSkill->InterruptibleAt);
+		return;
+	}
+
+	UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] TryInterrupt — interrupting skill='%s'"), *CurrentSkill->SkillName.ToString());
+
+	// 通知当前技能被打断
+	CurrentSkill->OnInterrupt(GetOwner());
+
+	// 清理技能状态，回到 IDLE
+	// 注意：不重置 QueueIndex，保留队列当前位置指向下一个技能
+	CurrentSkill = nullptr;
+	bSkillActive = false;
+	CurrentSkillStartTime = 0.0f;
+	bDamageApplied = false;
+	bInComboWindow = false;
+	ComboWindowEndTime = 0.0f;
+}
+
+void USkillSystemComponent::ForceEndCurrentSkill()
+{
+	if (!bSkillActive)
+	{
+		return;
+	}
+
+	UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] ForceEndCurrentSkill — skill='%s'"),
+		CurrentSkill ? *CurrentSkill->SkillName.ToString() : TEXT("nullptr"));
+
+	CurrentSkill = nullptr;
+	bSkillActive = false;
+	CurrentSkillStartTime = 0.0f;
+	bDamageApplied = false;
+
+	// 不进入连招窗口，直接回到 IDLE（适用于跳跃等自行管理时长、不需连招的技能）
+	bInComboWindow = false;
+	ComboWindowEndTime = 0.0f;
+	QueueIndex = 0;
+
+	UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] ForceEnd → IDLE (QueueIndex reset to 0)"));
 }
 
 bool USkillSystemComponent::IsNextSkillMovement() const

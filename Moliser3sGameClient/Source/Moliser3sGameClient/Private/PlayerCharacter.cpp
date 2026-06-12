@@ -3,6 +3,7 @@
 
 #include "PlayerCharacter.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Camera/CameraComponent.h"
 #include "Component/Facing/FacingComponent.h"
 #include "Component/Skill/SkillSystemComponent.h"
 #include "Skill/MeleeSlashSkill.h"
@@ -16,6 +17,10 @@ APlayerCharacter::APlayerCharacter()
 
 	// 创建技能系统组件
 	SkillSystemComponent = CreateDefaultSubobject<USkillSystemComponent>(TEXT("SkillSystemComponent"));
+
+	// 创建相机组件（不挂在任何组件下，由 CameraControllerComponent 控制位置和旋转）
+	// 相机完全独立于角色坐标系，不会继承任何轴向旋转
+	CameraComponent = CreateDefaultSubobject<UCameraComponent>(TEXT("CameraComponent"));
 
 	// 配置玩家角色的移动参数
 	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())

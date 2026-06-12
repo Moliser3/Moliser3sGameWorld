@@ -8,6 +8,7 @@
 
 class UClickDetectionComponent;
 class UInputMappingContext;
+class UCameraControllerComponent;
 
 /**
  * 
@@ -26,6 +27,10 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Click")
     UClickDetectionComponent* GetClickDetectionComponent() const { return ClickDetectionComponent; }
 
+    /** 获取摄像机控制器组件 */
+    UFUNCTION(BlueprintPure, Category = "Camera")
+    UCameraControllerComponent* GetCameraController() const { return CameraControllerComponent; }
+
     /** 处理鼠标左键点击 - 由蓝图输入事件调用 */
     UFUNCTION(BlueprintCallable, Category = "Input")
     void OnLeftMouseClick();
@@ -38,6 +43,10 @@ public:
     UFUNCTION(BlueprintPure, Category = "Click")
     FVector GetLastClickTarget() const { return LastClickTarget; }
 
+    /** 设置最后一次右键点击的目标位置（供技能系统修改，如跳跃截断后同步） */
+    UFUNCTION(BlueprintCallable, Category = "Click")
+    void SetLastClickTarget(const FVector& NewTarget) { LastClickTarget = NewTarget; }
+
 protected:
     virtual void BeginPlay() override;
 
@@ -49,6 +58,10 @@ protected:
     /** 点击检测组件 */
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Click")
     TObjectPtr<UClickDetectionComponent> ClickDetectionComponent;
+
+    /** 摄像机控制器组件 */
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera")
+    TObjectPtr<UCameraControllerComponent> CameraControllerComponent;
 
     /** 最后一次右键点击的目标位置 */
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Click")

@@ -2,7 +2,7 @@
 
 > 引擎：Unreal Engine 5.7  
 > 语言：C++  
-> 最后更新：2026/06/12
+> 最后更新：2026/06/12 20:12
 
 ---
 
@@ -336,18 +336,29 @@ TickComponent()
 
 | 日期 | 修改内容 | 涉及文件 |
 |------|---------|---------|
+| 06/12 | `OnRightMouseClick` 重构为统一技能化流程，移除 `IsNextSkillMovement` 特殊分支 | `WorldPlayerController.cpp` |
+| 06/12 | `ActivateNextSkill` IDLE 状态不再重置 QueueIndex=0；打断后 `goto ExecuteSkill` | `SkillSystemComponent.cpp` |
+| 06/12 | 新增 `UCameraControllerComponent`（双轴独立弹性相机跟随） | `CameraControllerComponent.h/.cpp`, `WorldPlayerController.h/.cpp`, `PlayerCharacter.h/.cpp` |
+| 06/12 | 移除 `USpringArmComponent`，Camera 独立于角色坐标系 | `PlayerCharacter.h/.cpp` |
+| 06/12 | 两阶段跳跃：`FlyDuration=0.72` 抛物线 + `Duration=2.07` 收尾动画 | `JumpSkill.h/.cpp` |
+| 06/12 | SkillBase 新增 `Update()` 和 `OnInterrupt()` 虚函数 | `SkillBase.h/.cpp` |
+| 06/12 | `SkillSystemComponent` Tick 驱动跳跃更新（移除 Timer） | `JumpSkill.cpp`, `SkillSystemComponent.cpp` |
+| 06/12 | `TryInterruptCurrentSkill()` 接口 + `GetCurrentSkillElapsed()` 接口 | `SkillSystemComponent.h/.cpp` |
+| 06/12 | `PlaySkillMontage` 无条件先停止再播放（移除 `MontageSlotName` 判断） | `SkillBase.cpp` |
+| 06/12 | 关闭运动模糊（`MotionBlurAmount=0`） | `CameraControllerComponent.cpp` |
+| 06/12 | 修复点击敌人跳跃原地起跳：`ActorLocation()` 而非 `HitLocation` | `WorldPlayerController.cpp` |
+| 06/12 | 修复二次跳跃被误拦截：移除 `IsFalling()` 检查 | `JumpSkill.cpp` |
+| 06/12 | 跳跃飞行阶段入口拦截 + 收尾放行 | `WorldPlayerController.cpp` |
 | 06/12 | 文档目录 `策划案` → `Document`，文件名翻译为英文 | `Document/*` |
-| 06/12 | 移动技能分类：新增 `bIsMovementSkill` 属性，`OnRightMouseClick` 增加移动技能优先判断 | `SkillBase.h`, `WorldPlayerController.cpp` |
-| 06/12 | 新增 `PeekNextSkill()` / `IsNextSkillMovement()` 接口 | `SkillSystemComponent.h/.cpp` |
+| 06/12 | 移动技能分类：新增 `bIsMovementSkill` + `PeekNextSkill()` / `IsNextSkillMovement()` | `SkillBase.h`, `WorldPlayerController.cpp`, `SkillSystemComponent.h/.cpp` |
 | 06/12 | 右键全功能操作（废弃左键、三合一移动/注视/攻击） | `WorldPlayerController.h/.cpp` |
 | 06/12 | MinAttackRange 改名 MaxAttackRange，默认值 100 | `SkillBase.h` |
-| 06/12 | GetNextAttackRange → GetMaxAttackRange（遍历队列） | `SkillSystemComponent.h/.cpp` |
 | 06/12 | 自动攻击机制（Tick 检测 bPendingAttack） | `WorldPlayerController.h/.cpp` |
 | 06/12 | StopDistance 完全移除 | `BaseCharacter.h`, `FacingComponent.cpp` |
 | 06/12 | InterruptibleAt 改为蓝图可配置，默认 0.3 | `SkillBase.h` |
 | 06/12 | 跳跃技能（抛物线位移，NavMesh检测，碰撞落地） | `JumpSkill.h/.cpp`, `PlayerCharacter.cpp` |
 | 06/11 | 技能系统新增 DamageAt / InterruptibleAt 属性，实现延迟伤害和技能打断 | `SkillBase.h/.cpp`, `SkillSystemComponent.h/.cpp`, `MeleeSlashSkill.cpp` |
-| 06/11 | 创建技术文档 | `策划案/技术文档.md` |
+| 06/11 | 创建技术文档、策划案 | `Document/*` |
 | 06/11 | 实现连招窗口机制（IDLE→ACTIVE→COMBO_WINDOW） | `SkillSystemComponent.h/.cpp` |
 | 06/11 | 技能系统添加 ComboWindowDuration 蓝图可配置 | `SkillSystemComponent.h` |
 | 06/10 | 添加蒙太奇播放功能 | `SkillBase.h/.cpp`, `MeleeSlashSkill.cpp` |
