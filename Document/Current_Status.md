@@ -1,46 +1,46 @@
 # 当前工作状态
 
-> 最后更新：2026/06/12 23:46
+> 最后更新：2026/06/13 01:51
 
 ## 当前阶段
 第一阶段（基础完善）**全部完成** ✅
-第二阶段（技能扩展）—— 跳跃技能打断/收尾期 Bug 修复中
+第二阶段（技能扩展）—— 打断机制统一化 + 自动攻击修复完成 ✅
 
-## 今日完成工作（06/12，继续）
+## 已完成工作（06/12~06/13）
 
-### 十五、WorldPlayerController 右键点击流程重写
-- 移除 `IsNextSkillMovement()` 特殊判断分支，所有点击统一走 `ActivateNextSkill()`
-- 点击检测失败不再阻断技能执行：点击检测仅用于更新 `LastClickTarget` 和注视目标
-- 飞行拦截改用 `GetInterruptibleAt()` 虚函数（解决蓝图覆盖 `InterruptibleAt` 导致飞行中被错误打断的问题）
+### 十九、打断机制统一化
+- `WorldPlayerController.cpp` 移除跳跃飞行拦截
+- `JumpSkill::Execute()` 完全移除 `bIsJumping` 守卫
+- 攻击技能与跳跃技能的打断路径完全一致，均通过 `ActivateNextSkill()` 状态机统一处理
 
-### 十六、SkillSystemComponent 空指针防御
-- `ActivateNextSkill()` auto-populate 时**遍历 SkillList 只加有效技能**（过滤空指针残留）
-- `SetSkillQueue()` 调用时也**过滤空指针**后再填充队列
-- `PeekNextSkill()` 循环跳过空指针，找到有效技能再返回
-- `ActivateNextSkill()` 的 ExecuteSkill 阶段循环查找有效技能
-- 新增 `IsInComboWindow()` 和 `GetQueueIndex()` 接口
+### 二十、无效技能实例过滤
+- auto-populate 和 ExecuteSkill 循环增加 `!SkillName.IsNone()` 过滤
+- 解决蓝图 `SkillList` 中隐藏的无名技能残留导致的队列元素错位
 
-### 十七、GetInterruptibleAt() 虚函数体系
-- `SkillBase` 新增 `virtual float GetInterruptibleAt() const`，默认返回 `InterruptibleAt` 属性
-- `JumpSkill` 覆盖 `GetInterruptibleAt()` 返回 `FMath::Max(InterruptibleAt, FlyDuration)`
-- `SkillSystemComponent` 中 `ActivateNextSkill()` 和 `TryInterruptCurrentSkill()` 均使用 `GetInterruptibleAt()`
-- `WorldPlayerController` 飞行拦截使用 `GetInterruptibleAt()`
-- 屏幕调试倒计时使用 `GetInterruptibleAt()` 判断可打断时机
-- **效果**：蓝图中错误覆盖 `InterruptibleAt=0.30` 不再影响飞行阶段的不可打断性
+### 二十一、右键交互重写
+- **点击敌人**：设注视目标 → 距离在攻击范围内直接攻击 / 超出则走近后自动攻击
+- **点击地面**：下一个是跳跃则执行跳跃 / 否则移动到点击位置
+- **自动攻击（bPendingAttack）**：Tick 中只靠距离判断触发攻击（移除 bStopped 扰动条件）
+- **注视模式全速移动**：点击地面移动时保留注视目标，速度恢复全速 600
 
-### 十八、调试辅助
-- 屏幕显示跳跃飞行/后摇倒计时（红色=飞行中不可打断，黄色=后摇可打断）
-- 屏幕显示点击检测命中/未命中
-- 屏幕显示跳跃目标可达性
-- 日志完善：`[JumpSkill] EXECUTE` 输出起点/目标/距离等信息
+### 二十二、Debug 辅助（已清理）
+- 调试期间在 Tick 和 OnRightMouseClick 中添加了 DrawDebug 圆圈/线条/数值
+- 发布前已全部移除
 
-## 当前已知问题
+## 当前已确认正常工作
+1. 点击近处敌人 → 直接攻击 ✅
+2. 点击远处敌人 → 走近后自动攻击 ✅
+3. 点击地面（攻击队列）→ 移动 ✅
+4. 点击地面（跳跃队列）→ 跳跃 ✅
+5. 跳跃后摇期点击 → 再次跳跃 ✅
+6. 单技能队列自打断 → 循环执行 ✅
+7. 注视模式下点击地面 → 保留注视，全速 600 奔跑 ✅
+8. 超出 LockOnRange(1000cm) → 自动切回 Walking 模式 ✅
+
+## 已知问题
 1. SimpleMoveToLocation 容差约 50cm，bPendingAttack 用 80cm 补偿
-2. `Duration`（3.50）和 `FlyDuration`（0.72）等参数被蓝图覆盖，与代码默认值不一致
-3. 收尾期第一次点击有时不生效（`JumpTargetLoc == JumpStartLoc` 导致的原地起跳感觉不到位移 / `IsTargetReachable()` 短暂返回 false）
 
 ## 对话备注
 - **Moliser3**：项目拥有者
 - **小C**：公司电脑上的 CLINE（XiaoC_Role.md）
 - **大C**：家里电脑上的 CLINE（DaC_Role.md）
-- **项目常识**：小C和大C共享（Project_Knowledge.md）

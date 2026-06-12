@@ -39,16 +39,6 @@ void UJumpSkill::Execute(AActor* Instigator)
 		return;
 	}
 
-	// 如果正在跳跃中，不重复触发
-	if (bIsJumping)
-	{
-		if (USkillSystemComponent* SkillSys = OwnerChar->FindComponentByClass<USkillSystemComponent>())
-		{
-			SkillSys->ForceEndCurrentSkill();
-		}
-		return;
-	}
-
 	// 强制确保飞行阶段不可打断（防止蓝图中 InterruptibleAt 被错误覆盖）
 	InterruptibleAt = FMath::Max(InterruptibleAt, FlyDuration);
 

@@ -63,12 +63,24 @@ void APlayerCharacter::BeginPlay()
 	}
 }
 
+void APlayerCharacter::SetAimingFullSpeed(bool bFullSpeed)
+{
+	bAimingFullSpeed = bFullSpeed;
+}
+
 void APlayerCharacter::UpdateMovementSpeed(EFacingMode NewMode)
 {
 	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
 	{
 		if (NewMode == EFacingMode::Aiming)
 		{
+			// 注视模式下，如果设了全速标志，使用奔跑速度
+			if (bAimingFullSpeed)
+			{
+				MoveComp->MaxWalkSpeed = GetRunSpeed();
+				return;
+			}
+
 			// 注视模式 — 使用锁定速度
 			float CurrentSpeed = MoveComp->MaxWalkSpeed;
 			if (FMath::IsNearlyEqual(CurrentSpeed, GetWalkSpeed(), 1.0f) || CurrentSpeed <= GetWalkSpeed() + 10.0f)
@@ -82,6 +94,9 @@ void APlayerCharacter::UpdateMovementSpeed(EFacingMode NewMode)
 		}
 		else
 		{
+			// 切回 Walking 模式时清除全速标志
+			bAimingFullSpeed = false;
+
 			// 非注视模式 — 恢复非锁定速度
 			float CurrentSpeed = MoveComp->MaxWalkSpeed;
 			if (FMath::IsNearlyEqual(CurrentSpeed, GetLockedWalkSpeed(), 1.0f) || CurrentSpeed <= GetLockedWalkSpeed() + 10.0f)

@@ -344,6 +344,7 @@ TickComponent()
 
 | 日期 | 修改内容 | 涉及文件 |
 |------|---------|---------|
+| 06/13 | **[修复] 跳跃后摇期无法打断**：`bIsJumping` 守卫不再 `ForceEndCurrentSkill()`+return，改为清理状态后继续执行新跳跃；INTERRUPT 日志增强 | `JumpSkill.cpp`, `SkillSystemComponent.cpp` |
 | 06/12 | 新增 `GetInterruptibleAt()` 虚函数，`JumpSkill` 覆盖返回 `Max(InterruptibleAt, FlyDuration)` | `SkillBase.h`, `JumpSkill.h/.cpp` |
 | 06/12 | 所有打断判断和飞行拦截改用 `GetInterruptibleAt()` | `SkillSystemComponent.cpp`, `WorldPlayerController.cpp` |
 | 06/12 | `WorldPlayerController` 简化：移除分支判断，统一 `ActivateNextSkill()` | `WorldPlayerController.cpp` |

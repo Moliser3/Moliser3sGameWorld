@@ -37,6 +37,13 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Components")
 	UCameraComponent* GetCamera() const { return CameraComponent; }
 
+	/**
+	 * 设置注视模式下的全速移动标志
+	 * 为 true 时注视模式下也能全速奔跑（用于点击地面移动时）
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Facing")
+	void SetAimingFullSpeed(bool bFullSpeed);
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -55,4 +62,7 @@ protected:
 	/** 相机组件（由 CameraControllerComponent 控制） */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera")
 	TObjectPtr<UCameraComponent> CameraComponent;
+
+	/** 注视模式下是否强制使用全速（点击地面移动时由 WorldPlayerController 设置） */
+	bool bAimingFullSpeed = false;
 };
