@@ -61,6 +61,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill", meta = (ClampMin = "-1.0"))
 	float MaxAttackRange = 100.0f;
 
+	/** 是否为移动技能（如跳跃），移动技能不受攻击距离判断约束，点击即可触发 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill")
+	bool bIsMovementSkill = false;
+
 	/** 技能蒙太奇（动画） */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill|Animation")
 	TObjectPtr<UAnimMontage> SkillMontage = nullptr;

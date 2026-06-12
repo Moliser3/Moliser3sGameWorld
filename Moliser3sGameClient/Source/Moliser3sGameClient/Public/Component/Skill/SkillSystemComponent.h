@@ -52,6 +52,14 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Skill")
 	float GetMaxAttackRange() const;
 
+	/** 预览队列中的下一个技能（不执行），用于判断技能类型 */
+	UFUNCTION(BlueprintPure, Category = "Skill")
+	USkillBase* PeekNextSkill() const;
+
+	/** 下一个技能是否为移动技能（如跳跃） */
+	UFUNCTION(BlueprintPure, Category = "Skill")
+	bool IsNextSkillMovement() const;
+
 	/** 连招窗口持续时间（秒），默认可在蓝图中配置 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Combo", meta = (ClampMin = "0.0"))
 	float ComboWindowDuration = 0.5f;

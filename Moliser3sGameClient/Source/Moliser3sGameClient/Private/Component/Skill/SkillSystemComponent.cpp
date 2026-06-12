@@ -213,6 +213,39 @@ float USkillSystemComponent::GetMaxAttackRange() const
 	return -1.0f;
 }
 
+USkillBase* USkillSystemComponent::PeekNextSkill() const
+{
+	// 获取活跃队列（优先 SkillQueue，其次 SkillList）
+	const TArray<TObjectPtr<USkillBase>>* ActiveQueue = &SkillQueue;
+	if (ActiveQueue->Num() == 0)
+	{
+		ActiveQueue = &SkillList;
+	}
+	if (ActiveQueue->Num() == 0)
+	{
+		return nullptr;
+	}
+
+	// QueueIndex 始终指向下一次要执行的技能：
+	// - IDLE 状态：QueueIndex=0，指向第一个技能
+	// - ACTIVE 状态：QueueIndex 已自增，指向当前技能的下一个
+	// - COMBO_WINDOW 状态：QueueIndex 已自增，指向连招的下一个
+	int32 Index = QueueIndex;
+	if (!ActiveQueue->IsValidIndex(Index))
+	{
+		Index = 0;
+	}
+
+	USkillBase* Skill = (*ActiveQueue)[Index];
+	return Skill;
+}
+
+bool USkillSystemComponent::IsNextSkillMovement() const
+{
+	USkillBase* Skill = PeekNextSkill();
+	return Skill ? Skill->bIsMovementSkill : false;
+}
+
 void USkillSystemComponent::SetSkillQueue(const TArray<USkillBase*>& InQueue)
 {
 	SkillQueue = InQueue;

@@ -112,72 +112,82 @@ void AWorldPlayerController::OnLeftMouseClick()
 
 void AWorldPlayerController::OnRightMouseClick()
 {
-    if (!ClickDetectionComponent)
-    {
-        return;
-    }
+	if (!ClickDetectionComponent)
+	{
+		return;
+	}
 
-    // 执行点击检测
-    FClickHitResult ClickResult = ClickDetectionComponent->DetectMouseClick(false);
+	// 执行点击检测
+	FClickHitResult ClickResult = ClickDetectionComponent->DetectMouseClick(false);
 
-    if (!ClickResult.bHitSuccess)
-    {
-        return;
-    }
+	if (!ClickResult.bHitSuccess)
+	{
+		return;
+	}
 
-    APlayerCharacter* MyCharacter = Cast<APlayerCharacter>(GetPawn());
-    if (!MyCharacter)
-    {
-        return;
-    }
+	APlayerCharacter* MyCharacter = Cast<APlayerCharacter>(GetPawn());
+	if (!MyCharacter)
+	{
+		return;
+	}
 
-    // 存储点击位置（供技能系统使用）
-    LastClickTarget = ClickResult.HitLocation;
+	// 存储点击位置（供技能系统使用，如跳跃技能读取此位置作为目标）
+	LastClickTarget = ClickResult.HitLocation;
 
-    // 右键点击到敌人
-    if (AEnemyCharacter* ClickedEnemy = Cast<AEnemyCharacter>(ClickResult.HitActor.Get()))
-    {
-        float Dist = FVector::Dist(MyCharacter->GetActorLocation(), ClickedEnemy->GetActorLocation());
+	// ── 第一步：检查下一个技能是否为移动技能（如跳跃） ──
+	// 移动技能不受攻击距离/敌人判断约束，点击即触发
+	USkillSystemComponent* SkillSys = MyCharacter->GetSkillSystem();
+	if (SkillSys && SkillSys->IsNextSkillMovement())
+	{
+		SkillSys->ActivateNextSkill();
+		return;
+	}
 
-        // 获取技能队列的 MaxAttackRange，-1 表示全远程技能
-        USkillSystemComponent* SkillSys = MyCharacter->GetSkillSystem();
-        float MaxRange = SkillSys ? SkillSys->GetMaxAttackRange() : -1.0f;
+	// ── 第二步：非移动技能 → 原有攻击/移动逻辑 ──
 
-        if (MaxRange > 0 && Dist <= MaxRange)
-        {
-            // 距离 ≤ 最大攻击距离 → 直接攻击（内部打断逻辑由 ActivateNextSkill 处理）
-            if (SkillSys)
-            {
-                SkillSys->ActivateNextSkill();
-            }
-        }
-        else if (MaxRange > 0)
-        {
-            // 距离 > 最大攻击距离 → 移动到最大攻击距离处 + 进入注视模式
-            if (UFacingComponent* FacingComp = MyCharacter->GetFacingComponent())
-            {
-                FVector DirToEnemy = (ClickedEnemy->GetActorLocation() - MyCharacter->GetActorLocation()).GetSafeNormal2D();
-                FVector MoveDest = ClickedEnemy->GetActorLocation() - DirToEnemy * MaxRange;
-                MyCharacter->MoveToLocation(MoveDest);
-                FacingComp->SetAimTarget(ClickedEnemy);
+	// 右键点击到敌人
+	if (AEnemyCharacter* ClickedEnemy = Cast<AEnemyCharacter>(ClickResult.HitActor.Get()))
+	{
+		float Dist = FVector::Dist(MyCharacter->GetActorLocation(), ClickedEnemy->GetActorLocation());
 
-                // 设置待攻击标记：走到攻击距离后自动释放技能
-                bPendingAttack = true;
-                PendingMaxRange = MaxRange;
-                UE_LOG(LogTemp, Warning, TEXT("[AutoAttack] Moving to attack range, Dist=%.0f MaxRange=%.0f"), Dist, MaxRange);
-            }
-        }
-        else
-        {
-            // MaxAttackRange = -1（全远程技能）→ 直接攻击（内部打断逻辑由 ActivateNextSkill 处理）
-            if (SkillSys)
-            {
-                SkillSys->ActivateNextSkill();
-            }
-        }
-        return;
-    }
+		// 获取技能队列的 MaxAttackRange，-1 表示全远程技能
+		float MaxRange = SkillSys ? SkillSys->GetMaxAttackRange() : -1.0f;
 
-    // 右键点击到地面或其他位置 → 移动（保持当前注视模式）
-    MyCharacter->MoveToLocation(ClickResult.HitLocation);
+		if (MaxRange > 0 && Dist <= MaxRange)
+		{
+			// 距离 ≤ 最大攻击距离 → 直接攻击（内部打断逻辑由 ActivateNextSkill 处理）
+			if (SkillSys)
+			{
+				SkillSys->ActivateNextSkill();
+			}
+		}
+		else if (MaxRange > 0)
+		{
+			// 距离 > 最大攻击距离 → 移动到最大攻击距离处 + 进入注视模式
+			if (UFacingComponent* FacingComp = MyCharacter->GetFacingComponent())
+			{
+				FVector DirToEnemy = (ClickedEnemy->GetActorLocation() - MyCharacter->GetActorLocation()).GetSafeNormal2D();
+				FVector MoveDest = ClickedEnemy->GetActorLocation() - DirToEnemy * MaxRange;
+				MyCharacter->MoveToLocation(MoveDest);
+				FacingComp->SetAimTarget(ClickedEnemy);
+
+				// 设置待攻击标记：走到攻击距离后自动释放技能
+				bPendingAttack = true;
+				PendingMaxRange = MaxRange;
+				UE_LOG(LogTemp, Warning, TEXT("[AutoAttack] Moving to attack range, Dist=%.0f MaxRange=%.0f"), Dist, MaxRange);
+			}
+		}
+		else
+		{
+			// MaxAttackRange = -1（全远程技能）→ 直接攻击（内部打断逻辑由 ActivateNextSkill 处理）
+			if (SkillSys)
+			{
+				SkillSys->ActivateNextSkill();
+			}
+		}
+		return;
+	}
+
+	// 右键点击到地面或其他位置 → 移动（保持当前注视模式）
+	MyCharacter->MoveToLocation(ClickResult.HitLocation);
 }

@@ -1,6 +1,6 @@
 # 当前工作状态
 
-> 最后更新：2026/06/12 14:49
+> 最后更新：2026/06/12 14:54
 
 ## 当前阶段
 第一阶段（基础完善）**全部完成** ✅
@@ -53,8 +53,15 @@
 
 ### 八、文档目录重命名
 - 目录 `策划案` → `Document`
-- 所有文档文件名翻译为英文（如 `当前工作状态.md` → `Current_Status.md`）
-- 修复编译时中文路径导致的 UBT GitSourceFileWorkingSet 崩溃
+- 所有文档文件名翻译为英文：
+  - `小C角色信息.md` → `XiaoC_Role.md`
+  - `当前工作状态.md` → `Current_Status.md`
+  - `技术文档.md` → `Technical_Document.md`
+  - `新对话启动流程.md` → `New_Conversation_Startup.md`
+  - `类暗黑破坏神游戏策划案.md` → `DiabloLike_GameDesign.md`
+  - `项目常识.md` → `Project_Knowledge.md`
+- 更新文档内部相互引用路径
+- 解决编译时中文路径导致的 UBT GitSourceFileWorkingSet 崩溃
 
 ## 下一阶段（待定）
 - 🗡️ 直线穿刺技能

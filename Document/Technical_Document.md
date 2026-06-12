@@ -62,7 +62,7 @@ Build.bat Moliser3sGameClientEditor Win64 Development -Project="项目路径\Mol
 | `AWorldPlayerController` | `APlayerController` | 处理鼠标输入（右键全功能操作） |
 
 **输入映射：**
-- 右键 → `OnRightMouseClick()` → 三合一：移动/注视/攻击
+- 右键 → `OnRightMouseClick()` → 三合一：移动/注视/攻击/移动技能
 - 左键 → `OnLeftMouseClick()` 已闲置（移除绑定即可）
 
 **新增关键成员：**
@@ -119,18 +119,22 @@ Build.bat Moliser3sGameClientEditor Win64 Development -Project="项目路径\Mol
 | `SetSkillQueue(InQueue)` | `TArray<USkillBase*>` | 设置技能循环队列 |
 | `IsSkillActive()` | 无 | 返回是否正在 ACTIVE 或 COMBO_WINDOW 状态 |
 | `GetMaxAttackRange()` | 无 | 遍历队列返回第一个近战技能的 MaxAttackRange（-1 表示全远程） |
+| `PeekNextSkill()` | 无 | 预览队列中的下一个技能（不执行），用于判断技能类型 |
+| `IsNextSkillMovement()` | 无 | 下一个技能是否为移动技能（如跳跃） |
 | `TickComponent(DeltaTime, ...)` | — | 检测 DamageAt/Duration/连招窗口到期 |
 
 #### 3.1.4 状态机（核心逻辑）
 
 ```
-右键点击敌人
+右键点击
   │
-  ▼
-OnRightMouseClick
-  ├─ 距离 ≤ MaxAttackRange → ActivateNextSkill()
-  ├─ 距离 > MaxAttackRange → MoveTo + bPendingAttack = true
-  └─ MaxAttackRange = -1 → ActivateNextSkill()
+  ├─ [下一个技能是移动技能（跳跃）?]
+  │   └─ 是 → ActivateNextSkill() 直接执行（不受攻击距离/敌人判断约束）
+  │
+  └─ [非移动技能] → 点击到敌人？
+      ├─ 是 → 距离 ≤ MaxAttackRange → ActivateNextSkill()
+      │        距离 > MaxAttackRange → MoveTo + bPendingAttack = true
+      └─ 否 → MoveToLocation(点击位置)
 
 Tick 检测 bPendingAttack
   ├─ 距离 ≤ MaxRange + 80cm → ActivateNextSkill()
@@ -157,6 +161,7 @@ COMBO_WINDOW → 超时(0.5s) → QueueIndex=0 → IDLE
 | `DamageAt` | `float` | 0.3 | 伤害触发时间点（秒），动画的"命中帧" |
 | `InterruptibleAt` | `float` | 0.3 | 可打断时间点（秒），超过可提前释放下一个技能；0=全程可打断 |
 | `MaxAttackRange` | `float` | 100.0 | 最大攻击距离（厘米），-1=无限制（远程） |
+| `bIsMovementSkill` | `bool` | false | 是否为移动技能（如跳跃），不受攻击距离判断约束 |
 | `SkillMontage` | `UAnimMontage*` | nullptr | 技能蒙太奇动画 |
 | `MontageSlotName` | `FName` | NAME_None | 蒙太奇槽位名称 |
 
@@ -167,7 +172,7 @@ COMBO_WINDOW → 超时(0.5s) → QueueIndex=0 → IDLE
 4. 调用 `Montage_Play(SkillMontage, 1.0f)`
 
 **Execute vs ApplyDamage：**
-- `Execute()`：停止移动 + 播放蒙太奇（跳跃技能额外调用 Character->Jump()）
+- `Execute()`：停止移动 + 播放蒙太奇（跳跃技能额外读取 LastClickTarget 做抛物线位移）
 - `ApplyDamage()`：在 `DamageAt` 时间点由 SkillSystemComponent 的 Tick 调用
 
 #### 3.1.6 UMeleeSlashSkill
@@ -207,11 +212,13 @@ COMBO_WINDOW → 超时(0.5s) → QueueIndex=0 → IDLE
   ↓
 ClickDetectionComponent->DetectMouseClick()
   ↓
-命中敌人？
-  是 → 距离 ≤ MaxAttackRange → ActivateNextSkill()
-       距离 > MaxAttackRange → MoveTo + SetAimTarget + bPendingAttack=true
-       距离 > MaxAttackRange 的 Tick 检测 → 到达后自动 ActivateNextSkill()
-  否 → MoveToLocation(点击位置)
+[下一个技能是移动技能?]
+  ├─ 是 → ActivateNextSkill()（跳跃等位移技能直接执行）
+  └─ 否 → 命中敌人？
+           ├─ 是 → 距离 ≤ MaxAttackRange → ActivateNextSkill()
+           │        距离 > MaxAttackRange → MoveTo + SetAimTarget + bPendingAttack=true
+           │        距离 > MaxAttackRange 的 Tick 检测 → 到达后自动 ActivateNextSkill()
+           └─ 否 → MoveToLocation(点击位置)
   ↓
 LastClickTarget = 点击位置（供跳跃技能使用）
 ```
@@ -244,19 +251,27 @@ LastClickTarget = 点击位置（供跳跃技能使用）
 ### 攻击处理流程
 
 ```
-右键点击敌人
+右键点击
   │
-  ▼
-OnRightMouseClick()
-  ├─ 距离 > MaxAttackRange
-  │   → MoveToLocation(敌人 - Dir * MaxRange)
-  │   → SetAimTarget(敌人)
-  │   → bPendingAttack = true
-  │   → Tick 检测: 到达距离或速度≈0
-  │     → ActivateNextSkill()（进入 ACTIVE）
+  ├─ IsNextSkillMovement() = true
+  │   → ActivateNextSkill()（跳过攻击距离/敌人检测）
   │
-  └─ 距离 ≤ MaxAttackRange 或 MaxAttackRange = -1
-      → ActivateNextSkill()（进入 ACTIVE）
+  └─ IsNextSkillMovement() = false
+      │
+      ▼
+      点击到敌人？
+      ├─ 是 → OnRightMouseClick()
+      │   ├─ 距离 > MaxAttackRange
+      │   │   → MoveToLocation(敌人 - Dir * MaxRange)
+      │   │   → SetAimTarget(敌人)
+      │   │   → bPendingAttack = true
+      │   │   → Tick 检测: 到达距离或速度≈0
+      │   │     → ActivateNextSkill()（进入 ACTIVE）
+      │   │
+      │   └─ 距离 ≤ MaxAttackRange 或 MaxAttackRange = -1
+      │       → ActivateNextSkill()（进入 ACTIVE）
+      │
+      └─ 否 → MoveToLocation（普通移动）
   │
   ▼
 ActivateNextSkill()
@@ -267,7 +282,7 @@ ActivateNextSkill()
   │
   ▼
 Skill->Execute(Instigator)
-  └─ PlaySkillMontage()
+  └─ PlaySkillMontage() / 跳跃抛物线
   │
   ▼
 TickComponent()
@@ -295,6 +310,7 @@ TickComponent()
 | DamageAt | 0.25 | 拳头打中时造成伤害 |
 | InterruptibleAt | 0.3 | 起手完毕后可打断 |
 | MaxAttackRange | 100 | 1 米攻击距离 |
+| bIsMovementSkill | false | 攻击技能，非移动技能 |
 | SkillMontage | [拖入蒙太奇] | |
 
 **跳跃技能示例：**
@@ -305,6 +321,7 @@ TickComponent()
 | Duration | 0.8 | |
 | InterruptibleAt | 999 | 全程不可打断 |
 | MaxAttackRange | -1 | 不使用攻击距离判定 |
+| bIsMovementSkill | true | 移动技能，点击即触发 |
 | JumpRange | 500 | 最远跳 5 米 |
 | JumpHeight | 200 | 最高 2 米 |
 | FlyDuration | 0.6 | 空中 0.6 秒 |
@@ -319,6 +336,9 @@ TickComponent()
 
 | 日期 | 修改内容 | 涉及文件 |
 |------|---------|---------|
+| 06/12 | 文档目录 `策划案` → `Document`，文件名翻译为英文 | `Document/*` |
+| 06/12 | 移动技能分类：新增 `bIsMovementSkill` 属性，`OnRightMouseClick` 增加移动技能优先判断 | `SkillBase.h`, `WorldPlayerController.cpp` |
+| 06/12 | 新增 `PeekNextSkill()` / `IsNextSkillMovement()` 接口 | `SkillSystemComponent.h/.cpp` |
 | 06/12 | 右键全功能操作（废弃左键、三合一移动/注视/攻击） | `WorldPlayerController.h/.cpp` |
 | 06/12 | MinAttackRange 改名 MaxAttackRange，默认值 100 | `SkillBase.h` |
 | 06/12 | GetNextAttackRange → GetMaxAttackRange（遍历队列） | `SkillSystemComponent.h/.cpp` |
