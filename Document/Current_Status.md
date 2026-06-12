@@ -1,6 +1,6 @@
 # 当前工作状态
 
-> 最后更新：2026/06/12 12:37
+> 最后更新：2026/06/12 14:49
 
 ## 当前阶段
 第一阶段（基础完善）**全部完成** ✅
@@ -36,10 +36,25 @@
 - `InterruptibleAt` 默认值 0.3
 
 ### 六、文档体系完善
-- `技术文档.md` 和 `策划案.md` 同步更新
-- 新增 `当前工作状态.md` — 项目进度快照
-- 新增 `项目常识.md` — 小C和大C共享的项目知识
-- 新增 `小C角色信息.md` — 身份和工作风格
+- `Technical_Document.md` 和 `DiabloLike_GameDesign.md` 同步更新
+- 新增 `Current_Status.md` — 项目进度快照
+- 新增 `Project_Knowledge.md` — 小C和大C共享的项目知识
+- 新增 `XiaoC_Role.md` — 身份和工作风格
+
+## 本日完成的工作（06/12 下午）
+
+### 七、移动技能分类改造
+- `SkillBase` 新增 `bIsMovementSkill` 属性，将跳跃技能标记为移动技能
+- `SkillSystemComponent` 新增 `PeekNextSkill()` / `IsNextSkillMovement()` 接口
+- `WorldPlayerController::OnRightMouseClick()` 流程重构：
+  - 先检测下一个技能是否为移动技能 → 是则直接执行，不受攻击距离/敌人判断约束
+  - 非移动技能走原有攻击/移动逻辑
+- 效果：点击地面或敌人都能触发跳跃，跳跃不会再被"移动到攻击距离"流程拦截
+
+### 八、文档目录重命名
+- 目录 `策划案` → `Document`
+- 所有文档文件名翻译为英文（如 `当前工作状态.md` → `Current_Status.md`）
+- 修复编译时中文路径导致的 UBT GitSourceFileWorkingSet 崩溃
 
 ## 下一阶段（待定）
 - 🗡️ 直线穿刺技能
@@ -53,6 +68,6 @@
 
 ## 对话备注
 - **Moliser3**：项目拥有者
-- **小C**：公司电脑上的 CLINE（小C角色信息.md）
+- **小C**：公司电脑上的 CLINE（XiaoC_Role.md）
 - **大C**：家里电脑上的 CLINE（由 Moliser3 自行创建）
-- **项目常识**：小C和大C共享（项目常识.md）
+- **项目常识**：小C和大C共享（Project_Knowledge.md）
