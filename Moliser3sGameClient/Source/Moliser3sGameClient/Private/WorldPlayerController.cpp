@@ -31,18 +31,62 @@ AWorldPlayerController::AWorldPlayerController()
 
     // 开启 Tick 以检测自动攻击
     PrimaryActorTick.bCanEverTick = true;
+    // v2: force recompile - ensure !NextSkill guard branch is active
 }
 
 void AWorldPlayerController::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
 
+    // ── 调试：显示跳跃技能后摇倒计时 ──
+    APlayerCharacter* MyCharacter = Cast<APlayerCharacter>(GetPawn());
+    if (MyCharacter)
+    {
+        if (USkillSystemComponent* SS = MyCharacter->GetSkillSystem())
+        {
+            if (SS->IsSkillActive())
+            {
+                USkillBase* CurSkill = SS->GetCurrentSkill();
+                if (CurSkill && CurSkill->bIsMovementSkill)
+                {
+                    float Elapsed = SS->GetCurrentSkillElapsed();
+                    float Remaining = CurSkill->Duration - Elapsed;
+                    float EffectiveInterruptAt = CurSkill->GetInterruptibleAt();
+                    if (Remaining > 0 && Elapsed >= EffectiveInterruptAt)
+                    {
+                        if (GEngine)
+                        {
+                            GEngine->AddOnScreenDebugMessage(1, 0.0f, FColor::Yellow,
+                                FString::Printf(TEXT("后摇 %.2fs / 剩余 %.2fs  [可打断]"), Elapsed, Remaining));
+                        }
+                    }
+                    else if (Remaining > 0)
+                    {
+                        if (GEngine)
+                        {
+                            GEngine->AddOnScreenDebugMessage(1, 0.0f, FColor::Red,
+                                FString::Printf(TEXT("飞行中 %.2fs / %.2fs  [不可打断]"), Elapsed, CurSkill->Duration));
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // 技能不在激活状态时清除倒计时显示
+                if (GEngine)
+                {
+                    GEngine->ClearOnScreenDebugMessages();
+                }
+            }
+        }
+    }
+
     if (!bPendingAttack)
     {
         return;
     }
 
-    APlayerCharacter* MyCharacter = Cast<APlayerCharacter>(GetPawn());
+    MyCharacter = Cast<APlayerCharacter>(GetPawn());
     if (!MyCharacter)
     {
         bPendingAttack = false;
@@ -137,10 +181,11 @@ void AWorldPlayerController::OnRightMouseClick()
 		if (CurSkill && CurSkill->bIsMovementSkill)
 		{
 			float Elapsed = SkillSys->GetCurrentSkillElapsed();
-			if (Elapsed >= 0.0f && Elapsed < CurSkill->InterruptibleAt)
+			float EffectiveInterruptAt = CurSkill->GetInterruptibleAt();
+			if (Elapsed >= 0.0f && Elapsed < EffectiveInterruptAt)
 			{
 				UE_LOG(LogTemp, Warning, TEXT("[WorldPC] Input ignored — jump flight phase (%.2f < InterruptibleAt=%.2f)"),
-					Elapsed, CurSkill->InterruptibleAt);
+					Elapsed, EffectiveInterruptAt);
 				bPendingAttack = false;
 				return;
 			}
@@ -148,63 +193,57 @@ void AWorldPlayerController::OnRightMouseClick()
 		}
 	}
 
-	// 执行点击检测
+	// 执行点击检测（用于获取点击位置和敌人目标）
 	FClickHitResult ClickResult = ClickDetectionComponent->DetectMouseClick(false);
-	if (!ClickResult.bHitSuccess)
+
+	// ── 调试屏幕信息：点击检测结果 ──
+	if (GEngine)
 	{
-		return;
+		GEngine->AddOnScreenDebugMessage(2, 2.0f, ClickResult.bHitSuccess ? FColor::Green : FColor::Red,
+			FString::Printf(TEXT("点击检测: %s  位置: %s"),
+				ClickResult.bHitSuccess ? TEXT("命中") : TEXT("未命中"),
+				*ClickResult.HitLocation.ToString()));
+		if (ClickResult.bHitSuccess)
+		{
+			GEngine->AddOnScreenDebugMessage(3, 2.0f, FColor::Cyan,
+				FString::Printf(TEXT("点击目标: %s"),
+					ClickResult.HitActor.IsValid() ? *ClickResult.HitActor->GetName() : TEXT("地面")));
+		}
 	}
 
-	// 存储点击位置（供跳跃技能读取目标位置）
-	LastClickTarget = ClickResult.HitLocation;
-
-	// ── 统一处理：先执行技能队列的下一个技能 ──
-	// 跳跃就是技能，不应该特殊判断。
-	// ActivateNextSkill 内部会处理：
-	//   1. 收尾阶段打断当前技能 → 执行队列中的下一个（跳跃/出拳）
-	//   2. IDLE 状态 → 从队列头部执行
-	//   3. 飞行阶段不可打断 → 忽略
-	//   4. 队列空 → 自动填充
-	if (SkillSys)
+	// 如果点击检测成功，更新目标位置和注视对象
+	if (ClickResult.bHitSuccess)
 	{
-		// 如果是点击敌人且 MaxAttackRange > 0 且距离超远时，需要先移动到攻击距离
-		// 否则直接执行技能
+		LastClickTarget = ClickResult.HitLocation;
+
 		AEnemyCharacter* ClickedEnemy = Cast<AEnemyCharacter>(ClickResult.HitActor.Get());
 		if (ClickedEnemy)
 		{
-			float Dist = FVector::Dist(MyCharacter->GetActorLocation(), ClickedEnemy->GetActorLocation());
-			float MaxRange = SkillSys->GetMaxAttackRange();
-
-			if (MaxRange > 0 && Dist > MaxRange && !SkillSys->IsNextSkillMovement())
-			{
-				// 远距敌人 + 下一个技能不是移动技能 → 移动到攻击距离
-				FVector DirToEnemy = (ClickedEnemy->GetActorLocation() - MyCharacter->GetActorLocation()).GetSafeNormal2D();
-				FVector MoveDest = ClickedEnemy->GetActorLocation() - DirToEnemy * MaxRange;
-				MyCharacter->MoveToLocation(MoveDest);
-
-				if (UFacingComponent* FacingComp = MyCharacter->GetFacingComponent())
-				{
-					FacingComp->SetAimTarget(ClickedEnemy);
-				}
-				bPendingAttack = true;
-				PendingMaxRange = MaxRange;
-				return;
-			}
-
-			// 近距敌人或下一个技能是移动技能 — 设置注视后执行技能
 			if (UFacingComponent* FacingComp = MyCharacter->GetFacingComponent())
-			{
 				FacingComp->SetAimTarget(ClickedEnemy);
-			}
 			LastClickTarget = ClickedEnemy->GetActorLocation();
 		}
+	}
+	// ── 点击检测失败时显示当前 LastClickTarget ──
+	else if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(4, 2.0f, FColor::Orange,
+			FString::Printf(TEXT("LastClickTarget(旧): %s"), *LastClickTarget.ToString()));
+	}
 
-		// 执行下一个技能（打断/IDLE/COMBO 都能处理）
+	// ── 无论点击检测是否成功，都尝试执行技能 ──
+	// ActivateNextSkill 内部包含打断/连招/IDLE 状态机逻辑
+	// 这样在收尾期点击地面即使没有碰撞体命中，也能触发打断执行下一个技能
+	if (SkillSys)
+	{
 		bPendingAttack = false;
 		SkillSys->ActivateNextSkill();
 		return;
 	}
 
-	// 没有技能系统 → 直接移动
-	MyCharacter->MoveToLocation(ClickResult.HitLocation);
+	// 没有技能系统且点击检测成功 → 直接移动
+	if (ClickResult.bHitSuccess)
+	{
+		MyCharacter->MoveToLocation(ClickResult.HitLocation);
+	}
 }

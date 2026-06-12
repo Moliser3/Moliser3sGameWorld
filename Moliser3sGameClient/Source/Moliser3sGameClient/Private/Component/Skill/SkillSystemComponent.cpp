@@ -87,9 +87,18 @@ void USkillSystemComponent::ActivateNextSkill()
 	{
 		if (SkillList.Num() > 0)
 		{
-			SkillQueue = SkillList;
+			// 遍历 SkillList，只加入有效技能（过滤掉蓝图数组中的空指针残留）
+			SkillQueue.Empty();
+			for (USkillBase* S : SkillList)
+			{
+				if (S)
+				{
+					SkillQueue.Add(S);
+				}
+			}
 			QueueIndex = 0;
-			UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] auto-populated SkillQueue from SkillList (%d skills)"), SkillList.Num());
+			UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] auto-populated SkillQueue from SkillList: %d valid skills (filtered from %d total)"),
+				SkillQueue.Num(), SkillList.Num());
 		}
 		else
 		{
@@ -105,9 +114,9 @@ void USkillSystemComponent::ActivateNextSkill()
 		// ACTIVE 状态：检查是否可打断
 		float Elapsed = Now - CurrentSkillStartTime;
 		UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] ACTIVE check — elapsed=%.2f InterruptibleAt=%.2f"),
-			Elapsed, CurrentSkill->InterruptibleAt);
+			Elapsed, CurrentSkill->GetInterruptibleAt());
 
-		if (Elapsed < CurrentSkill->InterruptibleAt)
+		if (Elapsed < CurrentSkill->GetInterruptibleAt())
 		{
 			// 不可打断：忽略本次点击
 			UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] ActivateNextSkill IGNORED — skill still in uninterruptible phase"));
@@ -162,11 +171,24 @@ ExecuteSkill:
 		QueueIndex = 0;
 	}
 
-	USkillBase* Skill = SkillQueue[QueueIndex];
+	// ── 循环查找有效技能（跳过队列中的空指针）──
+	USkillBase* Skill = nullptr;
+	int32 CheckedCount = 0;
+	while (CheckedCount < SkillQueue.Num())
+	{
+		Skill = SkillQueue[QueueIndex];
+		if (Skill)
+		{
+			break;
+		}
+		UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] ActivateNextSkill — skill at QueueIndex=%d is null, skipping"), QueueIndex);
+		QueueIndex = (QueueIndex + 1) % SkillQueue.Num();
+		CheckedCount++;
+	}
+
 	if (!Skill)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] ActivateNextSkill FAILED — skill at QueueIndex=%d is null, skipping to next"), QueueIndex);
-		QueueIndex = (QueueIndex + 1) % SkillQueue.Num();
+		UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] ActivateNextSkill FAILED — no valid skill found in queue!"));
 		return;
 	}
 
@@ -186,9 +208,10 @@ ExecuteSkill:
 	Skill->Execute(GetOwner());
 
 	// ── 第五步：移动到队列下一个位置 ──
+	int32 OldIndex = QueueIndex;
 	QueueIndex = (QueueIndex + 1) % SkillQueue.Num();
 
-	UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] advanced to QueueIndex=%d (next skill)"), QueueIndex);
+	UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] advanced from QueueIndex=%d to %d (next skill)"), OldIndex, QueueIndex);
 }
 
 void USkillSystemComponent::AddSkill(USkillBase* NewSkill)
@@ -250,6 +273,8 @@ USkillBase* USkillSystemComponent::PeekNextSkill() const
 	}
 	if (ActiveQueue->Num() == 0)
 	{
+		UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] PeekNextSkill — SkillQueue.Num=%d SkillList.Num=%d → nullptr"), 
+			SkillQueue.Num(), SkillList.Num());
 		return nullptr;
 	}
 
@@ -263,7 +288,22 @@ USkillBase* USkillSystemComponent::PeekNextSkill() const
 		Index = 0;
 	}
 
-	USkillBase* Skill = (*ActiveQueue)[Index];
+	// 从当前索引开始，循环查找第一个有效技能（跳过空指针）
+	int32 Checked = 0;
+	USkillBase* Skill = nullptr;
+	while (Checked < ActiveQueue->Num())
+	{
+		Skill = (*ActiveQueue)[Index];
+		if (Skill)
+		{
+			break;
+		}
+		Index = (Index + 1) % ActiveQueue->Num();
+		Checked++;
+	}
+
+	UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] PeekNextSkill — QueIdx=%d QueueSize=%d ListSize=%d → Skill=%s"),
+		QueueIndex, SkillQueue.Num(), SkillList.Num(), Skill ? *Skill->SkillName.ToString() : TEXT("null"));
 	return Skill;
 }
 
@@ -278,10 +318,10 @@ void USkillSystemComponent::TryInterruptCurrentSkill()
 	float Elapsed = Now - CurrentSkillStartTime;
 
 	// 检查是否可打断
-	if (Elapsed < CurrentSkill->InterruptibleAt)
+	if (Elapsed < CurrentSkill->GetInterruptibleAt())
 	{
 		UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] TryInterrupt — IGNORED (elapsed=%.2f < InterruptibleAt=%.2f)"),
-			Elapsed, CurrentSkill->InterruptibleAt);
+			Elapsed, CurrentSkill->GetInterruptibleAt());
 		return;
 	}
 
@@ -331,7 +371,15 @@ bool USkillSystemComponent::IsNextSkillMovement() const
 
 void USkillSystemComponent::SetSkillQueue(const TArray<USkillBase*>& InQueue)
 {
-	SkillQueue = InQueue;
+	// 过滤空指针后填充队列
+	SkillQueue.Empty();
+	for (USkillBase* S : InQueue)
+	{
+		if (S)
+		{
+			SkillQueue.Add(S);
+		}
+	}
 	QueueIndex = 0;
 	CurrentSkill = nullptr;
 	bSkillActive = false;
@@ -340,5 +388,8 @@ void USkillSystemComponent::SetSkillQueue(const TArray<USkillBase*>& InQueue)
 	CurrentSkillStartTime = 0.0f;
 	bDamageApplied = false;
 
-	UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] SetSkillQueue called — %d skills, QueueIndex=0"), InQueue.Num());
+	UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] SetSkillQueue called — %d in, %d valid skills, QueueIndex=0"),
+		InQueue.Num(), SkillQueue.Num());
 }
+
+// force recompile marker

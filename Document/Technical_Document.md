@@ -2,7 +2,7 @@
 
 > 引擎：Unreal Engine 5.7  
 > 语言：C++  
-> 最后更新：2026/06/12 20:12
+> 最后更新：2026/06/12 23:46
 
 ---
 
@@ -22,6 +22,7 @@ Moliser3sGameClient/Source/
 │   ├── Damage/                   # 伤害计算组件
 │   ├── Facing/                   # 朝向控制组件
 │   ├── Input/                    # 点击检测组件
+│   ├── Camera/                   # 摄像机控制器组件
 │   └── Skill/                    # 技能系统组件
 └── Skill/
     ├── SkillBase.h/.cpp          # 技能基类
@@ -62,10 +63,10 @@ Build.bat Moliser3sGameClientEditor Win64 Development -Project="项目路径\Mol
 | `AWorldPlayerController` | `APlayerController` | 处理鼠标输入（右键全功能操作） |
 
 **输入映射：**
-- 右键 → `OnRightMouseClick()` → 三合一：移动/注视/攻击/移动技能
+- 右键 → `OnRightMouseClick()` → 统一 `ActivateNextSkill()`（不再做 `IsNextSkillMovement()` 分支判断）
 - 左键 → `OnLeftMouseClick()` 已闲置（移除绑定即可）
 
-**新增关键成员：**
+**关键成员：**
 | 成员 | 类型 | 作用 |
 |------|------|------|
 | `LastClickTarget` | `FVector` | 最后一次右键点击位置（供跳跃技能使用） |
@@ -81,6 +82,7 @@ Build.bat Moliser3sGameClientEditor Win64 Development -Project="项目路径\Mol
 | `UFacingComponent` | 玩家角色 | 行走/注视两种朝向模式切换 |
 | `UClickDetectionComponent` | PlayerController | 屏幕鼠标射线检测 |
 | `USkillSystemComponent` | 角色 | 技能列表管理、技能队列循环、连招窗口、打断机制 |
+| `UCameraControllerComponent` | PlayerController | 双轴独立弹性相机跟随 |
 
 ---
 
@@ -100,7 +102,7 @@ Build.bat Moliser3sGameClientEditor Win64 Development -Project="项目路径\Mol
 | 变量 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `SkillList` | `TArray<USkillBase*>` | 空 | 编辑器中配置的所有技能 |
-| `SkillQueue` | `TArray<USkillBase*>` | 空 | 运行时循环队列，自动从 SkillList 填充 |
+| `SkillQueue` | `TArray<USkillBase*>` | 空 | 运行时循环队列，自动从 SkillList 填充（过滤空指针） |
 | `QueueIndex` | `int32` | 0 | 队列当前索引 |
 | `CurrentSkill` | `USkillBase*` | nullptr | 当前正在播放的技能 |
 | `CurrentSkillStartTime` | `float` | 0.0 | 当前技能开始时间戳 |
@@ -114,45 +116,62 @@ Build.bat Moliser3sGameClientEditor Win64 Development -Project="项目路径\Mol
 
 | 函数 | 参数 | 作用 |
 |------|------|------|
-| `ActivateNextSkill()` | 无 | 按状态机逻辑释放队列中的下一个技能（含打断检测） |
+| `ActivateNextSkill()` | 无 | 按状态机逻辑释放队列中的下一个技能（含打断检测、空指针跳过） |
 | `AddSkill(NewSkill)` | `USkillBase*` | 添加技能到 SkillList |
-| `SetSkillQueue(InQueue)` | `TArray<USkillBase*>` | 设置技能循环队列 |
+| `SetSkillQueue(InQueue)` | `TArray<USkillBase*>` | 设置技能循环队列（过滤空指针） |
 | `IsSkillActive()` | 无 | 返回是否正在 ACTIVE 或 COMBO_WINDOW 状态 |
 | `GetMaxAttackRange()` | 无 | 遍历队列返回第一个近战技能的 MaxAttackRange（-1 表示全远程） |
-| `PeekNextSkill()` | 无 | 预览队列中的下一个技能（不执行），用于判断技能类型 |
+| `PeekNextSkill()` | 无 | 预览队列中的下一个技能（跳过空指针） |
 | `IsNextSkillMovement()` | 无 | 下一个技能是否为移动技能（如跳跃） |
 | `TickComponent(DeltaTime, ...)` | — | 检测 DamageAt/Duration/连招窗口到期 |
+| `TryInterruptCurrentSkill()` | 无 | 尝试打断当前技能（不执行下一个） |
+| `ForceEndCurrentSkill()` | 无 | 强制结束当前技能，回到 IDLE |
+| `IsNextSkillMovement()` | 无 | 下一个技能是否为移动技能 |
+| `GetCurrentSkillElapsed()` | 无 | 获取当前技能已运行时间 |
 
 #### 3.1.4 状态机（核心逻辑）
 
 ```
-右键点击
+右键点击 → OnRightMouseClick()
   │
-  ├─ [下一个技能是移动技能（跳跃）?]
-  │   └─ 是 → ActivateNextSkill() 直接执行（不受攻击距离/敌人判断约束）
+  ├─ 飞行拦截检查（elapsed < GetInterruptibleAt()）
+  │   └─ 是 → IGNORE（返回，不做任何事）
   │
-  └─ [非移动技能] → 点击到敌人？
-      ├─ 是 → 距离 ≤ MaxAttackRange → ActivateNextSkill()
-      │        距离 > MaxAttackRange → MoveTo + bPendingAttack = true
-      └─ 否 → MoveToLocation(点击位置)
-
-Tick 检测 bPendingAttack
-  ├─ 距离 ≤ MaxRange + 80cm → ActivateNextSkill()
-  └─ 速度 ≈ 0（到达）→ ActivateNextSkill()
-
-ActivateNextSkill() 内部：
+  ├─ 点击检测（仅更新 LastClickTarget 和注视目标）
   │
-  ▼
+  └─ ActivateNextSkill()
+      │
+      ▼
 IDLE → 执行当前技能 → ACTIVE
 ACTIVE → 右键点击
-  ├─ elapsed < InterruptibleAt → IGNORE（不可打断）
-  └─ elapsed ≥ InterruptibleAt → INTERRUPT（打断执行下一个）
+  ├─ elapsed < GetInterruptibleAt() → IGNORE（不可打断）
+  └─ elapsed ≥ GetInterruptibleAt() → INTERRUPT（打断执行下一个）
 ACTIVE → Duration 到期 → COMBO_WINDOW
 COMBO_WINDOW → 右键 → 下一个技能
 COMBO_WINDOW → 超时(0.5s) → QueueIndex=0 → IDLE
+
+ActivateNextSkill() 内部断点：
+  │
+  ├─ IDLE: 保留 QueueIndex → ExecuteSkill
+  ├─ ACTIVE + 不可打断: return
+  ├─ ACTIVE + 可打断: OnInterrupt() + goto ExecuteSkill
+  └─ COMBO: 继续下一个 → ExecuteSkill
+
+ExecuteSkill:
+  ├─ 循环跳过空指针 → 找到有效技能
+  ├─ CurrentSkill = Skill
+  ├─ Skill->Execute(Owner)
+  └─ QueueIndex = (QueueIndex + 1) % QueueSize
 ```
 
-#### 3.1.5 USkillBase 关键属性
+#### 3.1.5 USkillBase
+
+**新增虚函数：**
+| 函数 | 默认实现 | 说明 |
+|------|---------|------|
+| `GetInterruptibleAt()` | `return InterruptibleAt` | 返回实际可打断时间点。子类可重写，如跳跃返回 `Max(InterruptibleAt, FlyDuration)` |
+
+**关键属性：**
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
@@ -193,15 +212,22 @@ COMBO_WINDOW → 超时(0.5s) → QueueIndex=0 → IDLE
 |------|--------|------|
 | `JumpRange` | 500.0 | 最大跳跃距离（厘米） |
 | `JumpHeight` | 200.0 | 抛物线最高点（厘米） |
-| `FlyDuration` | 0.6 | 空中飞行时间（秒） |
+| `FlyDuration` | 0.72 | 空中飞行时间（秒） |
+| `GetInterruptibleAt()` | `Max(InterruptibleAt, FlyDuration)` | 强制飞行阶段不可打断 |
+
+**两阶段设计：**
+- **阶段1（0 ~ FlyDuration）**：抛物线位移，`Update()` Tick 驱动
+- **阶段2（FlyDuration ~ Duration）**：落地收尾动画，角色不再移动，可打断
 
 **Execute 流程：**
-1. 从 `WorldPlayerController::GetLastClickTarget()` 读取目标位置
-2. 超过 JumpRange 则截断
-3. NavMesh 检测是否可达 → 不可达则原地起跳
-4. 停止移动 → 播放蒙太奇 → 初始化抛物线 Timer
-5. Timer 每帧按 `4 * JumpHeight * t * (1-t)` 计算抛物线位置
-6. 撞到障碍物或到达终点 → EndJump()
+1. 强制 `InterruptibleAt = Max(InterruptibleAt, FlyDuration)` 防止蓝图错误覆盖
+2. 从 `WorldPlayerController::GetLastClickTarget()` 读取目标位置
+3. 超过 `JumpRange` 则截断
+4. NavMesh 检测是否可达 → 不可达则原地起跳
+5. 停止移动 → 播放蒙太奇 → 初始化跳跃状态
+6. `Update()` 每帧按抛物线 `4 * JumpHeight * t * (1-t)` 计算位置
+7. 碰撞检测 → 撞到障碍物提前落地
+8. 阶段2进入收尾
 
 ### 3.2 输入系统
 
@@ -210,15 +236,13 @@ COMBO_WINDOW → 超时(0.5s) → QueueIndex=0 → IDLE
 ```
 右键点击（IA_RightClick Triggered）
   ↓
-ClickDetectionComponent->DetectMouseClick()
+[飞行阶段拦截] 当前技能是移动技能 且 elapsed < GetInterruptibleAt()?
+  ├─ 是 → IGNORE（不可打断阶段，忽略输入）
+  └─ 否 → 放行
   ↓
-[下一个技能是移动技能?]
-  ├─ 是 → ActivateNextSkill()（跳跃等位移技能直接执行）
-  └─ 否 → 命中敌人？
-           ├─ 是 → 距离 ≤ MaxAttackRange → ActivateNextSkill()
-           │        距离 > MaxAttackRange → MoveTo + SetAimTarget + bPendingAttack=true
-           │        距离 > MaxAttackRange 的 Tick 检测 → 到达后自动 ActivateNextSkill()
-           └─ 否 → MoveToLocation(点击位置)
+ClickDetectionComponent->DetectMouseClick()（仅用于更新位置）
+  ↓
+ActivateNextSkill() → 技能系统内部处理打断/IDLE/COMBO 状态
   ↓
 LastClickTarget = 点击位置（供跳跃技能使用）
 ```
@@ -253,41 +277,25 @@ LastClickTarget = 点击位置（供跳跃技能使用）
 ```
 右键点击
   │
-  ├─ IsNextSkillMovement() = true
-  │   → ActivateNextSkill()（跳过攻击距离/敌人检测）
+  ├─ 飞行拦截（elapsed < GetInterruptibleAt()）→ IGNORE
   │
-  └─ IsNextSkillMovement() = false
-      │
-      ▼
-      点击到敌人？
-      ├─ 是 → OnRightMouseClick()
-      │   ├─ 距离 > MaxAttackRange
-      │   │   → MoveToLocation(敌人 - Dir * MaxRange)
-      │   │   → SetAimTarget(敌人)
-      │   │   → bPendingAttack = true
-      │   │   → Tick 检测: 到达距离或速度≈0
-      │   │     → ActivateNextSkill()（进入 ACTIVE）
-      │   │
-      │   └─ 距离 ≤ MaxAttackRange 或 MaxAttackRange = -1
-      │       → ActivateNextSkill()（进入 ACTIVE）
-      │
-      └─ 否 → MoveToLocation（普通移动）
+  ├─ 点击检测 → 更新 LastClickTarget
   │
-  ▼
-ActivateNextSkill()
-  ├─ 不可打断(ACTIVE + elapsed < InterruptibleAt) → IGNORE
-  ├─ 可打断(ACTIVE + elapsed ≥ InterruptibleAt) → INTERRUPT
-  ├─ COMBO_WINDOW → 执行下一个
-  └─ IDLE → QueueIndex=0 → 执行
+  └─ ActivateNextSkill()
+      ├─ IDLE → 执行技能
+      ├─ ACTIVE + 不可打断 → IGNORE
+      ├─ ACTIVE + 可打断 → INTERRUPT + 执行下一个
+      └─ COMBO_WINDOW → 执行下一个
   │
   ▼
 Skill->Execute(Instigator)
-  └─ PlaySkillMontage() / 跳跃抛物线
+  └─ PlaySkillMontage()
   │
   ▼
 TickComponent()
-  ├─ DamageAt 到 → ApplyDamage() → 伤害结算
-  └─ Duration 到 → COMBO_WINDOW
+  ├─ DamageAt 到 → ApplyDamage()
+  ├─ Duration 到 → COMBO_WINDOW
+  └─ Update() → 跳跃抛物线/持续性技能
 ```
 
 ---
@@ -298,7 +306,7 @@ TickComponent()
 
 在角色蓝图中：
 1. 选中 `SkillSystemComponent`
-2. 在 `SkillList` 中添加技能实例
+2. 在 `SkillList` 中添加技能实例（注意：检查数组是否有空元素残留，建议先清空再添加）
 3. 配置每个技能实例的参数
 
 **近战技能示例（出拳）：**
@@ -318,13 +326,13 @@ TickComponent()
 | 参数 | 值 | 说明 |
 |------|-----|------|
 | SkillName | "跳跃" | |
-| Duration | 0.8 | |
-| InterruptibleAt | 999 | 全程不可打断 |
+| Duration | 2.07 | 完整跳跃动画（抛物线0.72+收尾1.35） |
+| InterruptibleAt | 0.72 | 被代码中 `GetInterruptibleAt()` 强制为 `Max(0.72, FlyDuration)` |
 | MaxAttackRange | -1 | 不使用攻击距离判定 |
 | bIsMovementSkill | true | 移动技能，点击即触发 |
 | JumpRange | 500 | 最远跳 5 米 |
 | JumpHeight | 200 | 最高 2 米 |
-| FlyDuration | 0.6 | 空中 0.6 秒 |
+| FlyDuration | 0.72 | 空中 0.72 秒 |
 
 ### 5.2 ComboWindowDuration
 
@@ -336,39 +344,33 @@ TickComponent()
 
 | 日期 | 修改内容 | 涉及文件 |
 |------|---------|---------|
-| 06/12 | `OnRightMouseClick` 重构为统一技能化流程，移除 `IsNextSkillMovement` 特殊分支 | `WorldPlayerController.cpp` |
-| 06/12 | `ActivateNextSkill` IDLE 状态不再重置 QueueIndex=0；打断后 `goto ExecuteSkill` | `SkillSystemComponent.cpp` |
-| 06/12 | 新增 `UCameraControllerComponent`（双轴独立弹性相机跟随） | `CameraControllerComponent.h/.cpp`, `WorldPlayerController.h/.cpp`, `PlayerCharacter.h/.cpp` |
-| 06/12 | 移除 `USpringArmComponent`，Camera 独立于角色坐标系 | `PlayerCharacter.h/.cpp` |
+| 06/12 | 新增 `GetInterruptibleAt()` 虚函数，`JumpSkill` 覆盖返回 `Max(InterruptibleAt, FlyDuration)` | `SkillBase.h`, `JumpSkill.h/.cpp` |
+| 06/12 | 所有打断判断和飞行拦截改用 `GetInterruptibleAt()` | `SkillSystemComponent.cpp`, `WorldPlayerController.cpp` |
+| 06/12 | `WorldPlayerController` 简化：移除分支判断，统一 `ActivateNextSkill()` | `WorldPlayerController.cpp` |
+| 06/12 | 点击检测失败不再阻断技能执行 | `WorldPlayerController.cpp` |
+| 06/12 | auto-populate 和 `SetSkillQueue` 过滤空指针 | `SkillSystemComponent.cpp` |
+| 06/12 | `PeekNextSkill()` 循环跳过空指针 | `SkillSystemComponent.cpp` |
+| 06/12 | 新增 `IsInComboWindow()` 和 `GetQueueIndex()` 接口 | `SkillSystemComponent.h/.cpp` |
+| 06/12 | 屏幕调试：倒计时/点击检测/跳跃目标可达性 | `WorldPlayerController.cpp` |
+| 06/12 | `OnRightMouseClick` 重构为统一技能化流程 | `WorldPlayerController.cpp` |
+| 06/12 | `ActivateNextSkill` IDLE 状态不再重置 QueueIndex=0 | `SkillSystemComponent.cpp` |
+| 06/12 | 新增 `UCameraControllerComponent`（双轴独立弹性相机跟随） | `CameraControllerComponent.h/.cpp` |
 | 06/12 | 两阶段跳跃：`FlyDuration=0.72` 抛物线 + `Duration=2.07` 收尾动画 | `JumpSkill.h/.cpp` |
 | 06/12 | SkillBase 新增 `Update()` 和 `OnInterrupt()` 虚函数 | `SkillBase.h/.cpp` |
-| 06/12 | `SkillSystemComponent` Tick 驱动跳跃更新（移除 Timer） | `JumpSkill.cpp`, `SkillSystemComponent.cpp` |
-| 06/12 | `TryInterruptCurrentSkill()` 接口 + `GetCurrentSkillElapsed()` 接口 | `SkillSystemComponent.h/.cpp` |
-| 06/12 | `PlaySkillMontage` 无条件先停止再播放（移除 `MontageSlotName` 判断） | `SkillBase.cpp` |
-| 06/12 | 关闭运动模糊（`MotionBlurAmount=0`） | `CameraControllerComponent.cpp` |
-| 06/12 | 修复点击敌人跳跃原地起跳：`ActorLocation()` 而非 `HitLocation` | `WorldPlayerController.cpp` |
-| 06/12 | 修复二次跳跃被误拦截：移除 `IsFalling()` 检查 | `JumpSkill.cpp` |
-| 06/12 | 跳跃飞行阶段入口拦截 + 收尾放行 | `WorldPlayerController.cpp` |
-| 06/12 | 文档目录 `策划案` → `Document`，文件名翻译为英文 | `Document/*` |
-| 06/12 | 移动技能分类：新增 `bIsMovementSkill` + `PeekNextSkill()` / `IsNextSkillMovement()` | `SkillBase.h`, `WorldPlayerController.cpp`, `SkillSystemComponent.h/.cpp` |
-| 06/12 | 右键全功能操作（废弃左键、三合一移动/注视/攻击） | `WorldPlayerController.h/.cpp` |
-| 06/12 | MinAttackRange 改名 MaxAttackRange，默认值 100 | `SkillBase.h` |
-| 06/12 | 自动攻击机制（Tick 检测 bPendingAttack） | `WorldPlayerController.h/.cpp` |
-| 06/12 | StopDistance 完全移除 | `BaseCharacter.h`, `FacingComponent.cpp` |
-| 06/12 | InterruptibleAt 改为蓝图可配置，默认 0.3 | `SkillBase.h` |
-| 06/12 | 跳跃技能（抛物线位移，NavMesh检测，碰撞落地） | `JumpSkill.h/.cpp`, `PlayerCharacter.cpp` |
-| 06/11 | 技能系统新增 DamageAt / InterruptibleAt 属性，实现延迟伤害和技能打断 | `SkillBase.h/.cpp`, `SkillSystemComponent.h/.cpp`, `MeleeSlashSkill.cpp` |
-| 06/11 | 创建技术文档、策划案 | `Document/*` |
-| 06/11 | 实现连招窗口机制（IDLE→ACTIVE→COMBO_WINDOW） | `SkillSystemComponent.h/.cpp` |
-| 06/11 | 技能系统添加 ComboWindowDuration 蓝图可配置 | `SkillSystemComponent.h` |
-| 06/10 | 添加蒙太奇播放功能 | `SkillBase.h/.cpp`, `MeleeSlashSkill.cpp` |
-| 06/10 | 技能系统重构（循环队列、Duration 控制） | `SkillSystemComponent.h/.cpp` |
-| 06/10 | 修复左键多技能 Bug | `WorldPlayerController.h/.cpp` |
+| 06/12 | Tick 驱动跳跃更新（移除 Timer） | `JumpSkill.cpp`, `SkillSystemComponent.cpp` |
+| 06/12 | `TryInterruptCurrentSkill()` / `GetCurrentSkillElapsed()` | `SkillSystemComponent.h/.cpp` |
+| 06/12 | `PlaySkillMontage` 无条件先停止再播放 | `SkillBase.cpp` |
+| 06/12 | 关闭运动模糊 | `CameraControllerComponent.cpp` |
+| 06/12 | 右键全功能操作 | `WorldPlayerController.h/.cpp` |
+| 06/12 | 移动技能分类：`bIsMovementSkill` + `PeekNextSkill()` | `SkillBase.h`, `SkillSystemComponent.h/.cpp` |
+| 06/12 | 跳跃技能（抛物线位移，NavMesh检测，碰撞落地） | `JumpSkill.h/.cpp` |
+| 06/11 | 技能系统基础（DamageAt/InterruptibleAt/连招窗口/循环队列） | 多文件 |
+| 06/10 | 技能系统初版 + 左键 Bug 修复 | 多文件 |
 
 ---
 
 ## 七、已知问题 / 待优化
 
 1. SimpleMoveToLocation 的精确度有限（约 50cm 容差），Tick 中 bPendingAttack 的到达判断使用 80cm 容差补偿
-2. 技能打断需要蓝图中正确配置 InterruptibleAt 值（默认 0.3）
-3. 跳跃技能的抛物线位移使用 Timer 驱动，若 Timer 精度不足可能出现轻微抖动
+2. 蓝图 `SkillList` 可能有空元素残留（`Instanced` 属性序列化导致），需手动清理后重新添加
+3. 跳跃技能蓝图实例覆盖了 `Duration=3.50` 和 `InterruptibleAt=0.30`，建议检查蓝图配置与代码默认值的一致性

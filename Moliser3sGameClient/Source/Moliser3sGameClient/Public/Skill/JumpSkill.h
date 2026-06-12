@@ -33,6 +33,7 @@ public:
 	virtual void Update(AActor* Instigator, float DeltaTime) override;
 	virtual void OnInterrupt(AActor* Instigator) override;
 	virtual void ApplyDamage(AActor* Instigator) override {}
+	virtual float GetInterruptibleAt() const override { return FMath::Max(InterruptibleAt, FlyDuration); }
 
 	/** 最大跳跃距离（厘米） */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill", meta = (ClampMin = "0.0"))

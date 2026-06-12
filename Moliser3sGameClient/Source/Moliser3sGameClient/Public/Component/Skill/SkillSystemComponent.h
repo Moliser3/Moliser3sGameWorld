@@ -68,6 +68,14 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Skill")
 	float GetCurrentSkillElapsed() const;
 
+	/** 是否处于连招窗口 */
+	UFUNCTION(BlueprintPure, Category = "Skill")
+	bool IsInComboWindow() const { return bInComboWindow; }
+
+	/** 获取队列当前索引 */
+	UFUNCTION(BlueprintPure, Category = "Skill")
+	int32 GetQueueIndex() const { return QueueIndex; }
+
 	/** 尝试打断当前技能（如果 elapsed ≥ InterruptibleAt），不执行下一个技能 */
 	UFUNCTION(BlueprintCallable, Category = "Skill")
 	void TryInterruptCurrentSkill();

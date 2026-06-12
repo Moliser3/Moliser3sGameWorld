@@ -49,6 +49,9 @@ void UJumpSkill::Execute(AActor* Instigator)
 		return;
 	}
 
+	// 强制确保飞行阶段不可打断（防止蓝图中 InterruptibleAt 被错误覆盖）
+	InterruptibleAt = FMath::Max(InterruptibleAt, FlyDuration);
+
 	// 获取角色当前位置作为起点
 	JumpStartLoc = OwnerChar->GetActorLocation();
 
@@ -70,6 +73,9 @@ void UJumpSkill::Execute(AActor* Instigator)
 
 	float HorizontalDist = FVector::Dist(Start2D, Target2D);
 
+	UE_LOG(LogTemp, Warning, TEXT("[JumpSkill] EXECUTE: Start=%s ClickTarget=%s HDist=%.0f JumpRange=%.0f"),
+		*JumpStartLoc.ToString(), *ClickTarget.ToString(), HorizontalDist, JumpRange);
+
 	// 如果目标太远，限制到 JumpRange
 	if (HorizontalDist > JumpRange)
 	{
@@ -87,7 +93,15 @@ void UJumpSkill::Execute(AActor* Instigator)
 		PlayerCtl->SetLastClickTarget(FinalTarget);
 	}
 
-	if (!IsTargetReachable(Instigator, FinalTarget))
+	bool bReachable = IsTargetReachable(Instigator, FinalTarget);
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(5, 2.0f, bReachable ? FColor::Green : FColor::Red,
+			FString::Printf(TEXT("跳跃目标: %s  距离: %.0f  可达: %s"),
+				*FinalTarget.ToString(), HorizontalDist, bReachable ? TEXT("是") : TEXT("否")));
+	}
+
+	if (!bReachable)
 	{
 		// 不可达 → 原地起跳
 		JumpTargetLoc = JumpStartLoc;

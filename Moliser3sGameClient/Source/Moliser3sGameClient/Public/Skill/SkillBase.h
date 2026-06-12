@@ -57,6 +57,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Skill")
 	void PlaySkillMontage(AActor* Instigator);
 
+	/**
+	 * 获取实际可打断时间点。
+	 * 默认为 InterruptibleAt 属性，子类可重写。
+	 * 例如跳跃技能返回 Max(InterruptibleAt, FlyDuration) 确保飞行中不可打断。
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Skill")
+	virtual float GetInterruptibleAt() const { return InterruptibleAt; }
+
 	/** 技能名称（用于调试和显示） */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill")
 	FName SkillName;
