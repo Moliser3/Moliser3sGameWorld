@@ -35,13 +35,11 @@ void UFacingComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActo
 	// 距离检测
 	float Dist = FVector::Dist(Owner->GetActorLocation(), AimTargetActor->GetActorLocation());
 
-	// 从基类读取解锁距离和停止距离
+	// 从基类读取解锁距离
 	float LockRange = 1000.0f;
-	float StopDist = 100.0f;
 	if (ABaseCharacter* BaseChar = Cast<ABaseCharacter>(Owner))
 	{
 		LockRange = BaseChar->GetLockOnRange();
-		StopDist = BaseChar->GetStopDistance();
 	}
 
 	// 超过最大距离 — 自动切回行走模式

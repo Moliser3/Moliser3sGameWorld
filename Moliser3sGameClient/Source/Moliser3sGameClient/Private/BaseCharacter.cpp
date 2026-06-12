@@ -3,7 +3,6 @@
 
 #include "BaseCharacter.h"
 #include "Blueprint/AIBlueprintHelperLibrary.h"
-#include "AIController.h"
 #include "Component/Attribute/AttributeComponent.h"
 #include "Component/Damage/DamageCalculatorComponent.h"
 

@@ -53,9 +53,13 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill", meta = (ClampMin = "0.0"))
 	float DamageAt = 0.3f;
 
-	/** 可打断时间（秒），超过此时间后可以提前释放下一个技能，0=全程不可打断 */
+	/** 可打断时间（秒），超过此时间后可以提前释放下一个技能；0=全程可打断 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill", meta = (ClampMin = "0.0"))
-	float InterruptibleAt = 0.5f;
+	float InterruptibleAt = 0.3f;
+
+	/** 最大攻击距离（厘米），-1 表示无限制（远程技能），近战技能填具体值 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill", meta = (ClampMin = "-1.0"))
+	float MaxAttackRange = 100.0f;
 
 	/** 技能蒙太奇（动画） */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill|Animation")

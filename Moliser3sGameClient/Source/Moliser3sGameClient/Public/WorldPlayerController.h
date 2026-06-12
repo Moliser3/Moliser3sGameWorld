@@ -20,6 +20,8 @@ class MOLISER3SGAMECLIENT_API AWorldPlayerController : public APlayerController
 public:
     AWorldPlayerController();
 
+    virtual void Tick(float DeltaTime) override;
+
     /** 获取点击检测组件 */
     UFUNCTION(BlueprintCallable, Category = "Click")
     UClickDetectionComponent* GetClickDetectionComponent() const { return ClickDetectionComponent; }
@@ -32,6 +34,10 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Input")
     void OnRightMouseClick();
 
+    /** 获取最后一次右键点击的目标位置（供技能系统使用） */
+    UFUNCTION(BlueprintPure, Category = "Click")
+    FVector GetLastClickTarget() const { return LastClickTarget; }
+
 protected:
     virtual void BeginPlay() override;
 
@@ -43,4 +49,14 @@ protected:
     /** 点击检测组件 */
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Click")
     TObjectPtr<UClickDetectionComponent> ClickDetectionComponent;
+
+    /** 最后一次右键点击的目标位置 */
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Click")
+    FVector LastClickTarget = FVector::ZeroVector;
+
+    /** 是否等待移动到攻击距离后自动攻击 */
+    bool bPendingAttack = false;
+
+    /** 待攻击的最大距离目标参数 */
+    float PendingMaxRange = 0.0f;
 };

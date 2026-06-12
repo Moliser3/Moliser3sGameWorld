@@ -62,10 +62,6 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Facing")
 	float GetLockOnRange() const { return LockOnRange; }
 
-	/** 获取停止距离 */
-	UFUNCTION(BlueprintPure, Category = "Facing")
-	float GetStopDistance() const { return StopDistance; }
-
 protected:
 	/** 属性组件 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
@@ -94,7 +90,4 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Custom", meta = (ClampMin = "0.0"))
 	float LockOnRange = 1000.0f;
 
-	/** 停止距离 — 离目标小于此距离时停止移动 */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Custom", meta = (ClampMin = "0.0"))
-	float StopDistance = 100.0f;
 };

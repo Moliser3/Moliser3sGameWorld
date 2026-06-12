@@ -69,6 +69,9 @@ void USkillSystemComponent::ActivateNextSkill()
 {
 	float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
 
+	UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] ActivateNextSkill called — bSkillActive=%d bInComboWindow=%d QueueIndex=%d"),
+		bSkillActive, bInComboWindow, QueueIndex);
+
 	// ── 第一步：确保队列有内容 ──
 	if (SkillQueue.Num() == 0)
 	{
@@ -91,17 +94,18 @@ void USkillSystemComponent::ActivateNextSkill()
 	{
 		// ACTIVE 状态：检查是否可打断
 		float Elapsed = Now - CurrentSkillStartTime;
+		UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] ACTIVE check — elapsed=%.2f InterruptibleAt=%.2f"),
+			Elapsed, CurrentSkill->InterruptibleAt);
+
 		if (Elapsed < CurrentSkill->InterruptibleAt)
 		{
 			// 不可打断：忽略本次点击
-			UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] ActivateNextSkill IGNORED — ACTIVE (elapsed=%.2f < InterruptibleAt=%.2f)"),
-				Elapsed, CurrentSkill->InterruptibleAt);
+			UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] ActivateNextSkill IGNORED — skill still in uninterruptible phase"));
 			return;
 		}
 
 		// 可打断：提前结束当前技能，然后执行下一个
-		UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] ActivateNextSkill INTERRUPT — breaking current skill '%s' (elapsed=%.2f >= InterruptibleAt=%.2f)"),
-			*CurrentSkill->SkillName.ToString(), Elapsed, CurrentSkill->InterruptibleAt);
+		UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] ActivateNextSkill INTERRUPT — cancelling current skill, executing next"));
 
 		// 清理当前技能状态
 		CurrentSkill = nullptr;
@@ -110,6 +114,13 @@ void USkillSystemComponent::ActivateNextSkill()
 		bDamageApplied = false;
 		bInComboWindow = false;
 		ComboWindowEndTime = 0.0f;
+
+		// QueueIndex 已经在之前 ++ 过了，指向下一个技能的位置
+		// 如果队列已循环一圈（到了最后一个技能后面），就回到 0
+		if (!SkillQueue.IsValidIndex(QueueIndex))
+		{
+			QueueIndex = 0;
+		}
 	}
 	else if (bSkillActive && !CurrentSkill)
 	{
@@ -152,8 +163,8 @@ void USkillSystemComponent::ActivateNextSkill()
 	bInComboWindow = false;
 	ComboWindowEndTime = 0.0f;
 
-	UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] EXECUTING skill='%s'  QueueIndex=%d  Duration=%.2fs  DamageAt=%.2f  InterruptibleAt=%.2f"),
-		*Skill->SkillName.ToString(), QueueIndex, Skill->Duration, Skill->DamageAt, Skill->InterruptibleAt);
+	UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] ==== EXECUTING skill='%s' QueueIndex=%d ===="),
+		*Skill->SkillName.ToString(), QueueIndex);
 
 	Skill->Execute(GetOwner());
 
@@ -171,6 +182,35 @@ void USkillSystemComponent::AddSkill(USkillBase* NewSkill)
 		UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] added skill '%s' to SkillList (total=%d)"),
 			*NewSkill->SkillName.ToString(), SkillList.Num());
 	}
+}
+
+float USkillSystemComponent::GetMaxAttackRange() const
+{
+	// 获取当前队列指针
+	const TArray<TObjectPtr<USkillBase>>* ActiveQueue = &SkillQueue;
+	if (ActiveQueue->Num() == 0)
+	{
+		ActiveQueue = &SkillList;
+	}
+	if (ActiveQueue->Num() == 0)
+	{
+		return -1.0f;
+	}
+
+	// 遍历队列查找第一个有有效 MaxAttackRange 的技能
+	for (int32 i = 0; i < ActiveQueue->Num(); i++)
+	{
+		USkillBase* Skill = (*ActiveQueue)[i];
+		if (Skill && Skill->MaxAttackRange > 0)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] GetMaxAttackRange — skill='%s' MaxAttackRange=%.0f"),
+				*Skill->SkillName.ToString(), Skill->MaxAttackRange);
+			return Skill->MaxAttackRange;
+		}
+	}
+
+	// 没有近战技能 → 全远程
+	return -1.0f;
 }
 
 void USkillSystemComponent::SetSkillQueue(const TArray<USkillBase*>& InQueue)

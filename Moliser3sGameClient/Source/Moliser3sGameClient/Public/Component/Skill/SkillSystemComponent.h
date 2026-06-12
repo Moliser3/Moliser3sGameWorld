@@ -48,6 +48,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Skill")
 	bool IsSkillActive() const { return bSkillActive; }
 
+	/** 获取技能队列中第一个近战技能的最大攻击距离（厘米），-1 表示全远程 */
+	UFUNCTION(BlueprintPure, Category = "Skill")
+	float GetMaxAttackRange() const;
+
 	/** 连招窗口持续时间（秒），默认可在蓝图中配置 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Combo", meta = (ClampMin = "0.0"))
 	float ComboWindowDuration = 0.5f;
