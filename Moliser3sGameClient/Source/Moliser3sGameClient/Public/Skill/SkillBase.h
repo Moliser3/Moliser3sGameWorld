@@ -4,17 +4,17 @@
 
 #include "CoreMinimal.h"
 #include "UObject/NoExportTypes.h"
+#include "Skill/SkillTypes.h"
 #include "SkillBase.generated.h"
 
 class UAnimMontage;
 
 /**
  * 技能基类
- * 所有技能继承此类，重写 Execute 和 ApplyDamage 实现具体逻辑
+ * 所有技能继承此类。
  *
- * Duration: 技能持续总时长
- * DamageAt: 伤害触发的时间点（动画的"命中帧"）
- * InterruptibleAt: 可打断时间点，超过此点可以提前释放下一个技能
+ * 技能生命周期：前摇(Windup) → 技能触发(OnExecute) → 后摇(Recovery) → 衔接时间(Link)
+ * 前摇不可打断，后摇可被打断，衔接时间决定技能组索引是否重置
  */
 UCLASS(Blueprintable, DefaultToInstanced, EditInlineNew)
 class MOLISER3SGAMECLIENT_API USkillBase : public UObject
@@ -22,72 +22,56 @@ class MOLISER3SGAMECLIENT_API USkillBase : public UObject
 	GENERATED_BODY()
 
 public:
-	/** 执行技能（播放蒙太奇、设置参数等） */
+	/** 执行技能（前摇开始时调用，播放蒙太奇、初始化状态等） */
 	UFUNCTION(BlueprintCallable, Category = "Skill")
 	virtual void Execute(AActor* Instigator);
 
-	/**
-	 * 每帧更新技能（由 SkillSystemComponent::TickComponent 调用）
-	 * 子类在此方法中实现持续性技能逻辑（如跳跃抛物线更新）
-	 * 基类空实现
-	 */
+	/** 前摇每帧更新（跳跃抛物线、蓄力等持续性逻辑） */
 	UFUNCTION(BlueprintCallable, Category = "Skill")
-	virtual void Update(AActor* Instigator, float DeltaTime);
+	virtual void OnWindupUpdate(AActor* Instigator, float DeltaTime);
 
 	/**
-	 * 技能被打断时调用（由 SkillSystemComponent 在打断时调用）
-	 * 子类在此方法中清理自己的运行时状态（如跳跃的 bIsJumping）
-	 * 基类空实现
+	 * 技能触发（前摇→后摇切换帧调用）
+	 * 伤害技能在此 ApplyDamage，跳跃在此落地
 	 */
+	UFUNCTION(BlueprintCallable, Category = "Skill")
+	virtual void OnExecute(AActor* Instigator);
+
+	/** 后摇每帧更新 */
+	UFUNCTION(BlueprintCallable, Category = "Skill")
+	virtual void OnRecoveryUpdate(AActor* Instigator, float DeltaTime);
+
+	/** 技能被打断时调用（后摇期间被点击打断），清理运行时状态 */
 	UFUNCTION(BlueprintCallable, Category = "Skill")
 	virtual void OnInterrupt(AActor* Instigator);
 
-	/**
-	 * 延迟应用伤害
-	 * 在 DamageAt 时间点由 SkillSystemComponent 调用
-	 * 子类在此方法中实现伤害逻辑
-	 */
-	UFUNCTION(BlueprintCallable, Category = "Skill")
-	virtual void ApplyDamage(AActor* Instigator);
-
-	/**
-	 * 在施法者身上播放技能蒙太奇
-	 * 子类 Execute 中可调用此方法
-	 */
+	/** 在施法者身上播放技能蒙太奇 */
 	UFUNCTION(BlueprintCallable, Category = "Skill")
 	void PlaySkillMontage(AActor* Instigator);
-
-	/**
-	 * 获取实际可打断时间点。
-	 * 默认为 InterruptibleAt 属性，子类可重写。
-	 * 例如跳跃技能返回 Max(InterruptibleAt, FlyDuration) 确保飞行中不可打断。
-	 */
-	UFUNCTION(BlueprintCallable, Category = "Skill")
-	virtual float GetInterruptibleAt() const { return InterruptibleAt; }
 
 	/** 技能名称（用于调试和显示） */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill")
 	FName SkillName;
 
-	/** 技能持续时间（秒），释放后经过此时间才算完成 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill", meta = (ClampMin = "0.0"))
-	float Duration = 1.0f;
+	/** 前摇 — 技能起手阶段时长（秒），此阶段不可打断 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill", meta = (ClampMin = "0.0", DisplayName = "前摇"))
+	float WindupTime = 0.3f;
 
-	/** 伤害触发时间（秒），从技能开始到实际造成伤害的延迟 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill", meta = (ClampMin = "0.0"))
-	float DamageAt = 0.3f;
+	/** 后摇 — 技能收尾阶段时长（秒），此阶段可被玩家打断 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill", meta = (ClampMin = "0.0", DisplayName = "后摇"))
+	float RecoveryTime = 0.5f;
 
-	/** 可打断时间（秒），超过此时间后可以提前释放下一个技能；0=全程可打断 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill", meta = (ClampMin = "0.0"))
-	float InterruptibleAt = 0.3f;
+	/** 衔接时间（秒）— 后摇结束后额外等待时长，此时间内点击可连贯到下一技能，超时则重置技能组索引 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill", meta = (ClampMin = "0.0", DisplayName = "衔接时间"))
+	float CustomLinkTime = 0.2f;
 
-	/** 最大攻击距离（厘米），-1 表示无限制（远程技能），近战技能填具体值 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill", meta = (ClampMin = "-1.0"))
-	float MaxAttackRange = 100.0f;
+	/** 最大释放技能距离（厘米），-1 表示无限制（远程/位移技能填写），近战技能填具体值 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill", meta = (ClampMin = "-1.0", DisplayName = "最大释放技能距离"))
+	float MaxSkillRange = 100.0f;
 
-	/** 是否为移动技能（如跳跃），移动技能不受攻击距离判断约束，点击即可触发 */
+	/** 技能分类（攻击/位移/辅助/复合），决定在控制器中如何响应点击 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill")
-	bool bIsMovementSkill = false;
+	ESkillCategory SkillCategory = ESkillCategory::Attack;
 
 	/** 技能蒙太奇（动画） */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill|Animation")

@@ -6,7 +6,6 @@
 #include "Camera/CameraComponent.h"
 #include "Component/Facing/FacingComponent.h"
 #include "Component/Skill/SkillSystemComponent.h"
-#include "Skill/MeleeSlashSkill.h"
 
 APlayerCharacter::APlayerCharacter()
 {
@@ -48,19 +47,6 @@ void APlayerCharacter::BeginPlay()
 		FacingComponent->OnFacingModeChanged.AddDynamic(this, &APlayerCharacter::UpdateMovementSpeed);
 	}
 
-	// 注册默认技能：近战斩击
-	if (SkillSystemComponent)
-	{
-		UMeleeSlashSkill* MeleeSlash = NewObject<UMeleeSlashSkill>(this);
-		if (MeleeSlash)
-		{
-			MeleeSlash->Radius = 100.0f;
-			MeleeSlash->HalfAngleDeg = 22.5f;
-			MeleeSlash->BaseDamage = 5.0f;
-			MeleeSlash->MaxZDiff = 150.0f;
-			SkillSystemComponent->AddSkill(MeleeSlash);
-		}
-	}
 }
 
 void APlayerCharacter::SetAimingFullSpeed(bool bFullSpeed)

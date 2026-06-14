@@ -13,13 +13,10 @@
  * 目标不可达时原地起跳。
  * 飞行中碰到障碍物则落地。
  *
- * 跳跃由 SkillSystemComponent 的 Tick 驱动（虚函数 Update），
- * 与引擎渲染帧完全同步，消除 Timer 驱动导致的卡顿。
- *
- * 两阶段设计：
- *   阶段1（0 ~ FlyDuration）：抛物线位移
- *   阶段2（FlyDuration ~ Duration）：落地收尾动画，角色不再移动
- *   技能总时长由 SkillBase::Duration 控制，蓝图可配置
+ * 生命周期：
+ *   前摇(Windup) = 抛物线飞行（不可打断）
+ *   技能触发(OnExecute) = 落地
+ *   后摇(Recovery) = 落地收尾动画（可打断）
  */
 UCLASS(Blueprintable, DefaultToInstanced, EditInlineNew)
 class MOLISER3SGAMECLIENT_API UJumpSkill : public USkillBase
@@ -30,10 +27,10 @@ public:
 	UJumpSkill();
 
 	virtual void Execute(AActor* Instigator) override;
-	virtual void Update(AActor* Instigator, float DeltaTime) override;
+	virtual void OnWindupUpdate(AActor* Instigator, float DeltaTime) override;
+	virtual void OnExecute(AActor* Instigator) override;
+	virtual void OnRecoveryUpdate(AActor* Instigator, float DeltaTime) override {}
 	virtual void OnInterrupt(AActor* Instigator) override;
-	virtual void ApplyDamage(AActor* Instigator) override {}
-	virtual float GetInterruptibleAt() const override { return FMath::Max(InterruptibleAt, FlyDuration); }
 
 	/** 最大跳跃距离（厘米） */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill", meta = (ClampMin = "0.0"))
@@ -43,14 +40,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill", meta = (ClampMin = "0.0"))
 	float JumpHeight = 200.0f;
 
-	/** 空中飞行时间（秒） */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill", meta = (ClampMin = "0.0"))
-	float FlyDuration = 0.6f;
-
 protected:
-	/** 结束跳跃 */
-	void EndJump(AActor* Instigator);
-
 	/** 检测目标位置是否可达 */
 	bool IsTargetReachable(AActor* Instigator, const FVector& Target) const;
 
@@ -59,6 +49,5 @@ protected:
 	bool bIsJumping = false;
 	FVector JumpStartLoc = FVector::ZeroVector;
 	FVector JumpTargetLoc = FVector::ZeroVector;
-	/** 跳跃进度（0~1），由 Update 每帧更新 */
 	float JumpProgress = 0.0f;
 };

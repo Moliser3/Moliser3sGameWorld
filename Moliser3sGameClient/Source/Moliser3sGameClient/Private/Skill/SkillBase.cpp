@@ -12,17 +12,22 @@ void USkillBase::Execute(AActor* Instigator)
 	// 基类空实现，子类重写
 }
 
-void USkillBase::Update(AActor* Instigator, float DeltaTime)
+void USkillBase::OnWindupUpdate(AActor* Instigator, float DeltaTime)
+{
+	// 基类空实现，子类重写
+}
+
+void USkillBase::OnExecute(AActor* Instigator)
+{
+	// 基类空实现，子类重写
+}
+
+void USkillBase::OnRecoveryUpdate(AActor* Instigator, float DeltaTime)
 {
 	// 基类空实现，子类重写
 }
 
 void USkillBase::OnInterrupt(AActor* Instigator)
-{
-	// 基类空实现，子类重写
-}
-
-void USkillBase::ApplyDamage(AActor* Instigator)
 {
 	// 基类空实现，子类重写
 }

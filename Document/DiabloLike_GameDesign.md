@@ -4,7 +4,7 @@
 > 语言：C++  
 > 项目名称：Moliser3sGameClient  
 > 策划日期：2026/06/12
-> 最后更新：2026/06/12 23:46
+> 最后更新：2026/06/14 22:45
 
 ---
 
@@ -36,31 +36,31 @@
   └─ MaxAttackRange = -1（远程）→ 直接攻击
 ```
 
-### 2.3 跳跃（✅ 已完成，打断机制持续优化中）
+### 2.3 跳跃（✅ 已完成）
 
 - 跳跃作为技能类型（UJumpSkill）融入技能循环队列
 - 右键点击地面设置目标位置，跳跃到目标（抛物线位移）
 - 目标不可达时原地起跳
 - 飞行中撞到障碍物则落地
 
-**两阶段设计：**
-  - **阶段1（0 ~ FlyDuration=0.72s）**：抛物线位移，由 SkillSystemComponent 的 Tick 驱动。**不可打断**（GetInterruptibleAt() 强制为 Max(InterruptibleAt, FlyDuration)=0.72）
-  - **阶段2（FlyDuration ~ Duration）**：落地收尾动画，角色不再移动。**可打断**
+**三段式生命周期（前摇→技能触发→后摇）：**
+  - **前摇（WindupTime=0.72s）**：抛物线位移，**不可打断**
+  - **技能触发（OnExecute）**：落地瞬间
+  - **后摇（RecoveryTime=1.35s）**：落地收尾动画，**可被玩家打断**
+  - **衔接时间（CustomLinkTime=0.2s）**：超时后技能组索引重置到第一个
 
-**打断规则：** `GetInterruptibleAt() = Max(InterruptibleAt, FlyDuration)`，飞行中不可打断，收尾期可打断
-
-**参数：** JumpRange=500, JumpHeight=200, FlyDuration=0.72, Duration=2.07
+**参数：** JumpRange=500, JumpHeight=200, WindupTime=0.72, RecoveryTime=1.35, CustomLinkTime=0.2
 
 ---
 
 ## 三、技能系统
 
-### 3.1 技能循环队列
+### 3.1 技能组循环
 
-玩家通过**鼠标右键**释放技能。所有点击统一走 `ActivateNextSkill()`，不再做移动/攻击分支判断。
+玩家通过**鼠标右键**释放技能。每个角色拥有一个技能组（`SkillGroup`，蓝图配置），组内技能循环释放。
 
 ```
-技能队列（SkillQueue）:
+技能组（SkillGroup）:
 ┌──────┬──────┬──────┬──────┐
 │ 技能A │ 技能B │ 跳跃 │ 技能C │
 └──┬───┴──┬───┴──┬───┴──┬───┘
@@ -68,24 +68,30 @@
    └──▶ 循环释放，到末尾回到开头
 ```
 
-`SkillQueue` 自动从蓝图 `SkillList` 填充，并在填充时**过滤空指针**。
+**索引规则：**
+- 1 技能组：索引永远指向自己（可自打断自循环）
+- 多技能组 + 衔接时间内点击：推进到下一技能
+- 多技能组 + 衔接超时后点击：重置到第一个技能
 
-### 3.2 连招 + 打断机制（✅ 已完成，持续优化）
+### 3.2 打断与衔接机制（✅ 已完成）
 
 ```
-IDLE → 右键点击 → 执行当前技能 → ACTIVE
-ACTIVE → 再次右键
-  ├─ elapsed < GetInterruptibleAt() → IGNORE（不可打断）
-  └─ elapsed ≥ GetInterruptibleAt() → INTERRUPT（打断执行下一个）
-ACTIVE → Duration 到期 → COMBO_WINDOW
-COMBO_WINDOW → 右键 → 下一个技能
-COMBO_WINDOW → 超时(0.5s) → QueueIndex=0 → IDLE
+Idle → ActivateNextSkill() → Windup（前摇，不可打断）
+  │ WindupTime 到
+  ▼
+OnExecute（技能触发，瞬间）
+  │
+  ▼
+Recovery（后摇，可打断）
+  ├─ 玩家点击 → OnInterrupt() → 下一技能 Windup
+  └─ RecoveryTime 到 → LinkWindow
 
-打断后流程：
-  ├─ OnInterrupt() → 清理当前技能运行时状态
-  ├─ goto ExecuteSkill → 跳过状态检查，直接执行下一个
-  └─ QueueIndex 保留，不重置
+LinkWindow（衔接时间）
+  ├─ 玩家点击 → 下一技能 Windup（索引推进）
+  └─ CustomLinkTime 超时 → GroupSkillIndex=0 → Idle
 ```
+
+**衔接时间 = RecoveryTime + CustomLinkTime**，在此时间内点击均可推进索引。
 
 ### 3.3 技能类型
 
@@ -94,18 +100,18 @@ COMBO_WINDOW → 超时(0.5s) → QueueIndex=0 → IDLE
 
 ### 3.4 技能配置
 
-所有参数暴露给蓝图，但 `JumpSkill` 的 `GetInterruptibleAt()` 重写为 `Max(InterruptibleAt, FlyDuration)` 防止蓝图错误覆盖飞行不可打断性。
+所有参数暴露给蓝图，通过 DisplayName 显示中文名。
 
-| 属性 | 说明 |
-|------|------|
-| SkillName | 技能名称 |
-| Duration | 技能持续时间 |
-| DamageAt | 伤害触发时间点（动画的"命中帧"） |
-| InterruptibleAt | 可打断时间点（子类可通过 GetInterruptibleAt() 重写） |
-| MaxAttackRange | 最大攻击距离 |
-| bIsMovementSkill | 是否为移动技能 |
-| SkillMontage | 蒙太奇动画 |
-| MontageSlotName | 槽位名称 |
+| 属性 | DisplayName | 说明 |
+|------|------------|------|
+| SkillName | — | 技能名称 |
+| WindupTime | **前摇** | 技能起手时间（不可打断） |
+| RecoveryTime | **后摇** | 收尾时间（可打断） |
+| CustomLinkTime | **衔接时间** | 后摇后额外等待 |
+| MaxSkillRange | **最大释放技能距离** | -1=无限制 |
+| SkillCategory | — | 技能分类（Attack/Movement/Utility/Hybrid） |
+| SkillMontage | — | 蒙太奇动画 |
+| MontageSlotName | — | 槽位名称 |
 
 ---
 
@@ -133,14 +139,15 @@ COMBO_WINDOW → 超时(0.5s) → QueueIndex=0 → IDLE
 | 属性组件 | UAttributeComponent，血量/法力/攻击/防御属性 |
 | 伤害计算组件 | UDamageCalculatorComponent，计算最终伤害（含暴击） |
 | 朝向组件 | UFacingComponent，行走/注视模式切换 |
-| 技能基类 | USkillBase，所有技能参数蓝图可配置，新增 GetInterruptibleAt() 虚函数 |
-| 扇形斩击技能 | UMeleeSlashSkill，扇形范围伤害（延迟触发） |
-| 跳跃技能 | UJumpSkill，抛物线位移跳跃，两阶段设计，GetInterruptibleAt() 强制飞行不可打断 |
-| 技能系统组件 | USkillSystemComponent，技能队列/连招窗口/打断/延迟伤害/空指针过滤 |
-| 右键全功能 | 统一 ActivateNextSkill() 流程，点击检测失败不阻断 |
+| 技能基类 | USkillBase，前摇(Windup)/技能触发(OnExecute)/后摇(Recovery)/衔接(CustomLink) 三段式 |
+| 伤害技能中间类 | UDamageSkillBase，OnExecute 时触发 ApplyDamage |
+| 扇形斩击技能 | UMeleeSlashSkill，扇形范围伤害，激发瞬间触发 |
+| 跳跃技能 | UJumpSkill，抛物线位移跳跃，前摇=飞行，后摇=落地收尾 |
+| 技能系统组件 | USkillSystemComponent，技能组管理 + 四阶段状态机 |
+| 右键全功能 | 根据 GetNextSkillCategory() 分类处理 |
 | 自动攻击 | Tick 检测 bPendingAttack，到达距离后自动 ActivateNextSkill |
-| 技能打断 | GetInterruptibleAt() 虚函数控制，子类可重写 |
-| 延迟伤害 | DamageAt 时间点触发 ApplyDamage |
+| 技能打断 | 后摇阶段全程可打断 |
+| 技能组循环 | 1 技能自循环 / 多技能推进 + 衔接超时重置 |
 | 玩家控制器 | AWorldPlayerController，右键全功能操作 |
 | 摄像机控制器 | UCameraControllerComponent，双轴独立弹性跟随 |
 
@@ -179,7 +186,9 @@ Source/Moliser3sGameClient/
 │   ├── Camera/                    # 摄像机控制器组件
 │   └── Skill/                     # 技能系统组件
 └── Skill/
-    ├── SkillBase.h/.cpp           # 技能基类 ✅（含 GetInterruptibleAt 虚函数）
+    ├── SkillTypes.h               # 枚举定义 ✅
+    ├── SkillBase.h/.cpp           # 技能基类 ✅（前摇/后摇/衔接时间）
+    ├── DamageSkillBase.h/.cpp     # 伤害技能中间类 ✅
     ├── MeleeSlashSkill.h/.cpp     # 扇形斩击 ✅
     ├── JumpSkill.h/.cpp           # 跳跃技能 ✅
     ├── LinearThrustSkill/         # ⬜ 直线穿刺
@@ -193,16 +202,14 @@ Source/Moliser3sGameClient/
 
 ```
 第一阶段：基础完善（已完成 ✅）
-  ├─ [✅] 修复左键多技能 Bug
-  ├─ [✅] 技能循环队列 + Duration 控制
+  ├─ [✅] 技能三段式生命周期（前摇/技能触发/后摇/衔接）
+  ├─ [✅] 技能组系统（1 技能自循环 / 多技能推进）
   ├─ [✅] 蒙太奇动画播放
   ├─ [✅] 跳跃技能（抛物线位移）
-  ├─ [✅] 连招窗口机制
-  ├─ [✅] 技能打断（GetInterruptibleAt 虚函数）
-  ├─ [✅] 延迟伤害（DamageAt）
-  ├─ [✅] 右键全功能（统一 ActivateNextSkill）
+  ├─ [✅] 技能打断（后摇可打断）
+  ├─ [✅] 右键全功能（根据 SkillCategory 分类处理）
   ├─ [✅] 自动攻击（bPendingAttack）
-  ├─ [✅] 空指针防御（SkillList/Queue 过滤）
+  ├─ [✅] 技能分类枚举（Attack/Movement/Utility/Hybrid）
   └─ [✅] 摄像机控制器（双轴弹性跟随）
 
 第二阶段：技能扩展（当前阶段）

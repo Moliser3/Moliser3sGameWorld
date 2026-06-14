@@ -30,6 +30,12 @@ void UMeleeSlashSkill::Execute(AActor* Instigator)
 	PlaySkillMontage(Instigator);
 }
 
+void UMeleeSlashSkill::OnExecute(AActor* Instigator)
+{
+	// 激发瞬间：前摇结束，直接造成伤害
+	ApplyDamage(Instigator);
+}
+
 void UMeleeSlashSkill::ApplyDamage(AActor* Instigator)
 {
 	if (!Instigator)
@@ -50,7 +56,7 @@ void UMeleeSlashSkill::ApplyDamage(AActor* Instigator)
 	FCollisionQueryParams QueryParams;
 	QueryParams.AddIgnoredActor(Instigator);
 
-	FCollisionShape Sphere = FCollisionShape::MakeSphere(Radius);
+	FCollisionShape Sphere = FCollisionShape::MakeSphere(MaxSkillRange);
 	TArray<FOverlapResult> Overlaps;
 
 	Instigator->GetWorld()->OverlapMultiByChannel(

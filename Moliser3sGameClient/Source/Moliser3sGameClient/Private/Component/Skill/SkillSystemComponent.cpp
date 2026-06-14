@@ -3,6 +3,7 @@
 
 #include "Component/Skill/SkillSystemComponent.h"
 #include "Skill/SkillBase.h"
+#include "Skill/DamageSkillBase.h"
 #include "Engine/World.h"
 
 USkillSystemComponent::USkillSystemComponent()
@@ -17,45 +18,56 @@ void USkillSystemComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 
 	float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
 
-	if (bSkillActive && CurrentSkill)
+	// ── 前摇阶段 ──
+	if (SkillPhase == ESkillPhase::Windup && CurrentSkill)
 	{
-		float Elapsed = Now - CurrentSkillStartTime;
+		float Elapsed = Now - PhaseStartTime;
 
-		if (!bDamageApplied && Elapsed >= CurrentSkill->DamageAt)
+		CurrentSkill->OnWindupUpdate(GetOwner(), DeltaTime);
+
+		if (Elapsed >= CurrentSkill->WindupTime)
 		{
-			UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] DamageAt triggered for '%s' (elapsed=%.2f, DamageAt=%.2f)"),
-				*CurrentSkill->SkillName.ToString(), Elapsed, CurrentSkill->DamageAt);
+			UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] OnExecute for '%s'"),
+				*CurrentSkill->SkillName.ToString());
 
-			CurrentSkill->ApplyDamage(GetOwner());
-			bDamageApplied = true;
-		}
-
-		if (Elapsed >= CurrentSkill->Duration)
-		{
-			CurrentSkill = nullptr;
-			bSkillActive = false;
-			CurrentSkillStartTime = 0.0f;
-			bDamageApplied = false;
-
-			bInComboWindow = true;
-			ComboWindowEndTime = Now + ComboWindowDuration;
-		}
-		else
-		{
-			if (bSkillActive && CurrentSkill)
-			{
-				CurrentSkill->Update(GetOwner(), DeltaTime);
-			}
+			// 前摇结束 → 技能触发
+			CurrentSkill->OnExecute(GetOwner());
+			SkillPhase = ESkillPhase::Recovery;
+			PhaseStartTime = Now;
 		}
 	}
-
-	if (bInComboWindow)
+	// ── 后摇阶段 ──
+	else if (SkillPhase == ESkillPhase::Recovery && CurrentSkill)
 	{
-		if (Now >= ComboWindowEndTime)
+		float Elapsed = Now - PhaseStartTime;
+
+		CurrentSkill->OnRecoveryUpdate(GetOwner(), DeltaTime);
+
+		if (Elapsed >= CurrentSkill->RecoveryTime)
 		{
-			bInComboWindow = false;
-			ComboWindowEndTime = 0.0f;
-			QueueIndex = 0;
+			// 缓存在 CurrentSkill 置空前保存衔接时间
+			CachedLinkDuration = CurrentSkill->CustomLinkTime;
+
+			UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] Recovery done for '%s', link window (%.2f s)"),
+				*CurrentSkill->SkillName.ToString(), CachedLinkDuration);
+
+			CurrentSkill = nullptr;
+			SkillPhase = ESkillPhase::LinkWindow;
+			PhaseStartTime = Now;
+		}
+	}
+	// ── 衔接阶段（后摇结束后的额外等待期）──
+	else if (SkillPhase == ESkillPhase::LinkWindow)
+	{
+		float Elapsed = Now - PhaseStartTime;
+
+		if (Elapsed >= CachedLinkDuration)
+		{
+			// 衔接超时，重置技能组索引到第一个
+			GroupSkillIndex = 0;
+			SkillPhase = ESkillPhase::Idle;
+
+			UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] Link window expired, reset index to 0"));
 		}
 	}
 }
@@ -64,150 +76,88 @@ void USkillSystemComponent::ActivateNextSkill()
 {
 	float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
 
-	// ── 第一步：确保队列有内容 ──
-	if (SkillQueue.Num() == 0)
+	if (SkillGroup.Num() == 0)
 	{
-		if (SkillList.Num() > 0)
-		{
-			SkillQueue.Empty();
-			for (USkillBase* S : SkillList)
-			{
-				// 过滤空指针 + 过滤 SkillName 为空的无效技能实例（蓝图序列化残留）
-				if (S && !S->SkillName.IsNone())
-				{
-					SkillQueue.Add(S);
-				}
-			}
-			QueueIndex = 0;
-
-			if (SkillQueue.Num() == 0)
-			{
-				UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] ActivateNextSkill FAILED — no valid skills after filtering!"));
-				return;
-			}
-		}
-		else
-		{
-			UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] ActivateNextSkill FAILED — SkillQueue and SkillList are both empty!"));
-			return;
-		}
-	}
-
-	// ── 第二步：状态检查 ──
-	if (bSkillActive && CurrentSkill)
-	{
-		float Elapsed = Now - CurrentSkillStartTime;
-
-		if (Elapsed < CurrentSkill->GetInterruptibleAt())
-		{
-			// 不可打断：忽略本次点击
-			return;
-		}
-
-		// 可打断
-		CurrentSkill->OnInterrupt(GetOwner());
-
-		CurrentSkill = nullptr;
-		bSkillActive = false;
-		CurrentSkillStartTime = 0.0f;
-		bDamageApplied = false;
-		bInComboWindow = false;
-		ComboWindowEndTime = 0.0f;
-
-		if (!SkillQueue.IsValidIndex(QueueIndex))
-		{
-			QueueIndex = 0;
-		}
-
-		goto ExecuteSkill;
-	}
-	else if (bSkillActive && !CurrentSkill)
-	{
-		bSkillActive = false;
-	}
-	else if (!bInComboWindow)
-	{
-		// IDLE 状态：保留 QueueIndex
-	}
-	else
-	{
-		// COMBO_WINDOW 状态：继续下一个技能
-	}
-
-ExecuteSkill:
-	if (!SkillQueue.IsValidIndex(QueueIndex))
-	{
-		QueueIndex = 0;
-	}
-
-	// 循环查找有效技能（跳过空指针 + 跳过 SkillName 为空的无名技能）
-	USkillBase* Skill = nullptr;
-	int32 CheckedCount = 0;
-	while (CheckedCount < SkillQueue.Num())
-	{
-		Skill = SkillQueue[QueueIndex];
-		if (Skill && !Skill->SkillName.IsNone())
-		{
-			break;
-		}
-		QueueIndex = (QueueIndex + 1) % SkillQueue.Num();
-		CheckedCount++;
-	}
-
-	if (!Skill || Skill->SkillName.IsNone())
-	{
-		UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] FAILED — no valid skill found in queue!"));
+		UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] ActivateNextSkill FAILED — SkillGroup is empty!"));
 		return;
 	}
 
+	// ── 状态检查 ──
+	switch (SkillPhase)
+	{
+	case ESkillPhase::Windup:
+		// 前摇不可打断
+		return;
+
+	case ESkillPhase::Recovery:
+		// 后摇可打断 → 打断当前技能
+		if (CurrentSkill)
+		{
+			CurrentSkill->OnInterrupt(GetOwner());
+			CurrentSkill = nullptr;
+		}
+		SkillPhase = ESkillPhase::Idle;
+		break;
+
+	case ESkillPhase::Idle:
+	case ESkillPhase::LinkWindow:
+		break;
+	}
+
+	// ── 组内取下一个有效技能 ──
+	int32 Index = GroupSkillIndex;
+	if (!SkillGroup.IsValidIndex(Index))
+	{
+		Index = 0;
+		GroupSkillIndex = 0;
+	}
+
+	USkillBase* Skill = SkillGroup[Index];
+	if (!Skill || Skill->SkillName.IsNone())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[SkillSystem] FAILED — no valid skill at index %d!"), Index);
+		return;
+	}
+
+	// 执行技能
 	CurrentSkill = Skill;
-	CurrentSkillStartTime = Now;
-	bSkillActive = true;
-	bDamageApplied = false;
-	bInComboWindow = false;
-	ComboWindowEndTime = 0.0f;
+	SkillPhase = ESkillPhase::Windup;
+	PhaseStartTime = Now;
 
 	Skill->Execute(GetOwner());
 
-	QueueIndex = (QueueIndex + 1) % SkillQueue.Num();
+	// 推进组内索引（技能组只有 1 个时，索引永远指向自己）
+	if (SkillGroup.Num() > 1)
+	{
+		GroupSkillIndex = (GroupSkillIndex + 1) % SkillGroup.Num();
+	}
+	else
+	{
+		GroupSkillIndex = 0;
+	}
 }
 
 void USkillSystemComponent::AddSkill(USkillBase* NewSkill)
 {
 	if (NewSkill)
 	{
-		SkillList.Add(NewSkill);
+		SkillGroup.Add(NewSkill);
 	}
 }
 
-float USkillSystemComponent::GetCurrentSkillElapsed() const
+float USkillSystemComponent::GetMaxSkillRange() const
 {
-	if (!bSkillActive || !CurrentSkill)
-	{
-		return -1.0f;
-	}
-	float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
-	return Now - CurrentSkillStartTime;
-}
-
-float USkillSystemComponent::GetMaxAttackRange() const
-{
-	const TArray<TObjectPtr<USkillBase>>* ActiveQueue = &SkillQueue;
-	if (ActiveQueue->Num() == 0)
-	{
-		ActiveQueue = &SkillList;
-	}
-	if (ActiveQueue->Num() == 0)
+	if (SkillGroup.Num() == 0)
 	{
 		return -1.0f;
 	}
 
-	for (int32 i = 0; i < ActiveQueue->Num(); i++)
+	for (int32 i = 0; i < SkillGroup.Num(); i++)
 	{
-		USkillBase* Skill = (*ActiveQueue)[i];
-		if (Skill && Skill->MaxAttackRange > 0)
+		USkillBase* Skill = SkillGroup[i];
+		if (Skill && Skill->MaxSkillRange > 0)
 		{
-			return Skill->MaxAttackRange;
+			return Skill->MaxSkillRange;
 		}
 	}
 
@@ -216,103 +166,22 @@ float USkillSystemComponent::GetMaxAttackRange() const
 
 USkillBase* USkillSystemComponent::PeekNextSkill() const
 {
-	const TArray<TObjectPtr<USkillBase>>* ActiveQueue = &SkillQueue;
-	if (ActiveQueue->Num() == 0)
-	{
-		ActiveQueue = &SkillList;
-	}
-	if (ActiveQueue->Num() == 0)
+	if (SkillGroup.Num() == 0)
 	{
 		return nullptr;
 	}
 
-	int32 Index = QueueIndex;
-	if (!ActiveQueue->IsValidIndex(Index))
+	int32 Index = GroupSkillIndex;
+	if (!SkillGroup.IsValidIndex(Index))
 	{
-		Index = 0;
+		return nullptr;
 	}
 
-	int32 Checked = 0;
-	USkillBase* Skill = nullptr;
-	while (Checked < ActiveQueue->Num())
-	{
-		Skill = (*ActiveQueue)[Index];
-		if (Skill)
-		{
-			break;
-		}
-		Index = (Index + 1) % ActiveQueue->Num();
-		Checked++;
-	}
-
-	return Skill;
+	return SkillGroup[Index];
 }
 
-void USkillSystemComponent::TryInterruptCurrentSkill()
-{
-	if (!bSkillActive || !CurrentSkill)
-	{
-		return;
-	}
-
-	float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
-	float Elapsed = Now - CurrentSkillStartTime;
-
-	if (Elapsed < CurrentSkill->GetInterruptibleAt())
-	{
-		return;
-	}
-
-	CurrentSkill->OnInterrupt(GetOwner());
-
-	CurrentSkill = nullptr;
-	bSkillActive = false;
-	CurrentSkillStartTime = 0.0f;
-	bDamageApplied = false;
-	bInComboWindow = false;
-	ComboWindowEndTime = 0.0f;
-}
-
-void USkillSystemComponent::ForceEndCurrentSkill()
-{
-	if (!bSkillActive)
-	{
-		return;
-	}
-
-	CurrentSkill = nullptr;
-	bSkillActive = false;
-	CurrentSkillStartTime = 0.0f;
-	bDamageApplied = false;
-
-	bInComboWindow = false;
-	ComboWindowEndTime = 0.0f;
-	QueueIndex = 0;
-}
-
-bool USkillSystemComponent::IsNextSkillMovement() const
+ESkillCategory USkillSystemComponent::GetNextSkillCategory() const
 {
 	USkillBase* Skill = PeekNextSkill();
-	return Skill ? Skill->bIsMovementSkill : false;
+	return Skill ? Skill->SkillCategory : ESkillCategory::Attack;
 }
-
-void USkillSystemComponent::SetSkillQueue(const TArray<USkillBase*>& InQueue)
-{
-	SkillQueue.Empty();
-	for (USkillBase* S : InQueue)
-	{
-		if (S)
-		{
-			SkillQueue.Add(S);
-		}
-	}
-	QueueIndex = 0;
-	CurrentSkill = nullptr;
-	bSkillActive = false;
-	bInComboWindow = false;
-	ComboWindowEndTime = 0.0f;
-	CurrentSkillStartTime = 0.0f;
-	bDamageApplied = false;
-}
-
-// force recompile marker

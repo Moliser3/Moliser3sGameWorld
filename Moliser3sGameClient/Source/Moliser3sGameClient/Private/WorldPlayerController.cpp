@@ -120,11 +120,11 @@ void AWorldPlayerController::OnRightMouseClick()
 			FacingComp->SetAimTarget(ClickedEnemy);
 		LastClickTarget = ClickedEnemy->GetActorLocation();
 
-		float MaxRange = SkillSys->GetMaxAttackRange();
-		bool bIsMovementSkill = SkillSys->IsNextSkillMovement();
+		float MaxRange = SkillSys->GetMaxSkillRange();
+		ESkillCategory NextCat = SkillSys->GetNextSkillCategory();
 
-		// 移动技能（跳跃）→ 直接执行
-		if (bIsMovementSkill)
+		// 位移/辅助技能 → 直接执行（不受距离约束）
+		if (NextCat == ESkillCategory::Movement || NextCat == ESkillCategory::Utility)
 		{
 			bPendingAttack = false;
 			SkillSys->ActivateNextSkill();
@@ -149,12 +149,16 @@ void AWorldPlayerController::OnRightMouseClick()
 		return;
 	}
 
-	// ── 点击地面：处理移动或跳跃 ──
-	if (SkillSys && SkillSys->IsNextSkillMovement() && ClickResult.bHitSuccess)
+	// ── 点击地面：位移/辅助/复合技能直接执行（跳跃到目标位置或冲锋等）──
+	if (ClickResult.bHitSuccess && SkillSys)
 	{
-		bPendingAttack = false;
-		SkillSys->ActivateNextSkill();
-		return;
+		ESkillCategory NextCat = SkillSys->GetNextSkillCategory();
+		if (NextCat == ESkillCategory::Movement || NextCat == ESkillCategory::Hybrid || NextCat == ESkillCategory::Utility)
+		{
+			bPendingAttack = false;
+			SkillSys->ActivateNextSkill();
+			return;
+		}
 	}
 
 	// ── 点击地面 → 移动 ──
