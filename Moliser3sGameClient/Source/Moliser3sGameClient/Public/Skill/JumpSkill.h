@@ -33,11 +33,11 @@ public:
 	virtual void OnInterrupt(AActor* Instigator) override;
 
 	/** 最大跳跃距离（厘米） */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill", meta = (ClampMin = "0.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill", meta = (ClampMin = "0.0", DisplayName = "最大跳跃距离"))
 	float JumpRange = 500.0f;
 
 	/** 抛物线最高点高度（厘米） */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill", meta = (ClampMin = "0.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill", meta = (ClampMin = "0.0", DisplayName = "跳跃最高点高度"))
 	float JumpHeight = 200.0f;
 
 protected:

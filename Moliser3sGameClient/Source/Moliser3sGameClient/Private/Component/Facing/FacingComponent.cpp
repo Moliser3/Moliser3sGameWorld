@@ -3,7 +3,6 @@
 #include "GameFramework/Character.h"
 #include "Engine/World.h"
 #include "Math/UnrealMathUtility.h"
-#include "BaseCharacter.h"
 
 
 UFacingComponent::UFacingComponent()
@@ -32,24 +31,7 @@ void UFacingComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActo
 		return;
 	}
 
-	// 距离检测
-	float Dist = FVector::Dist(Owner->GetActorLocation(), AimTargetActor->GetActorLocation());
-
-	// 从基类读取解锁距离
-	float LockRange = 1000.0f;
-	if (ABaseCharacter* BaseChar = Cast<ABaseCharacter>(Owner))
-	{
-		LockRange = BaseChar->GetLockOnRange();
-	}
-
-	// 超过最大距离 — 自动切回行走模式
-	if (Dist > LockRange)
-	{
-		ClearAimTarget();
-		return;
-	}
-
-	// 注视朝向 — 平滑转向目标
+	// 注视朝向 — 平滑转向目标（距离检查由 Controller 的 BattlePerceptionRange 统一管理）
 	FVector Direction = (AimTargetActor->GetActorLocation() - Owner->GetActorLocation()).GetSafeNormal2D();
 	if (!Direction.IsNearlyZero())
 	{

@@ -27,14 +27,14 @@ public:
 	virtual void ApplyDamage(AActor* Instigator) override;
 
 	/** 扇形角度（单侧） */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill", meta = (DisplayName = "扇形半角"))
 	float HalfAngleDeg = 22.5f;
 
 	/** 技能基础伤害 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill", meta = (DisplayName = "技能基础伤害"))
 	float BaseDamage = 5.0f;
 
 	/** 最大高度差 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill", meta = (DisplayName = "最大高度差"))
 	float MaxZDiff = 150.0f;
 };

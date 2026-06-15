@@ -65,4 +65,13 @@ protected:
 
 	/** 注视模式下是否强制使用全速（点击地面移动时由 WorldPlayerController 设置） */
 	bool bAimingFullSpeed = false;
+
+	/** 战斗感知范围 — 超出此距离自动退出战斗状态 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Custom", meta = (ClampMin = "0.0"))
+	float BattlePerceptionRange = 1500.0f;
+
+public:
+	/** 获取战斗感知范围 */
+	UFUNCTION(BlueprintPure, Category = "Facing")
+	float GetBattlePerceptionRange() const { return BattlePerceptionRange; }
 };

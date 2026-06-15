@@ -7,6 +7,7 @@
 #include "Component/Facing/FacingComponent.h"
 #include "Component/Skill/SkillSystemComponent.h"
 #include "Skill/SkillBase.h"
+#include "Animation/AnimInstance.h"
 #include "EnhancedInputSubsystems.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "PlayerCharacter.h"
@@ -31,20 +32,73 @@ void AWorldPlayerController::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
 
-    if (!bPendingAttack)
-    {
-        return;
-    }
-
     APlayerCharacter* MyCharacter = Cast<APlayerCharacter>(GetPawn());
-    if (!MyCharacter)
-    {
-        bPendingAttack = false;
-        return;
-    }
+    if (!MyCharacter) return;
 
     UFacingComponent* FacingComp = MyCharacter->GetFacingComponent();
-    AActor* AimTarget = FacingComp ? FacingComp->GetAimTarget() : nullptr;
+    USkillSystemComponent* SkillSys = MyCharacter->GetSkillSystem();
+    if (!FacingComp || !SkillSys) return;
+
+    AActor* AimTarget = FacingComp->GetAimTarget();
+
+    // ── 1. 战斗状态转移：超出战斗感知范围或无目标 → 默认状态 ──
+    if (CurrentPlayerState == EPlayerState::Battle)
+    {
+        if (!AimTarget)
+        {
+            SetPlayerState(EPlayerState::Default);
+        }
+        else
+        {
+            float Dist = FVector::Dist(MyCharacter->GetActorLocation(), AimTarget->GetActorLocation());
+            if (Dist > MyCharacter->GetBattlePerceptionRange())
+            {
+                SetPlayerState(EPlayerState::Default);
+            }
+        }
+    }
+
+    // ── 2. 技能结束恢复注视（位移技能释放完毕后切回）──
+    ESkillPhase CurrentPhase = SkillSys->GetSkillPhase();
+    if (CurrentPlayerState == EPlayerState::Battle && bPreviousSkillActive && CurrentPhase == ESkillPhase::Idle)
+    {
+        AActor* SkillEndTarget = FacingComp->GetAimTarget();
+        if (SkillEndTarget && FacingComp->GetCurrentFacingMode() != EFacingMode::Aiming)
+        {
+            float Dist = FVector::Dist(MyCharacter->GetActorLocation(), SkillEndTarget->GetActorLocation());
+            if (Dist <= MyCharacter->GetBattlePerceptionRange())
+            {
+                FacingComp->SetAimTarget(SkillEndTarget);
+            }
+        }
+    }
+    bPreviousSkillActive = (CurrentPhase != ESkillPhase::Idle);
+
+    // ── 3. Shift奔跑结束后的注视恢复 ──
+    if (CurrentPlayerState == EPlayerState::Battle && bPendingRestoreAiming)
+    {
+        AActor* RunTarget = FacingComp->GetAimTarget();
+        if (!RunTarget)
+        {
+            bPendingRestoreAiming = false;
+        }
+        else if (MyCharacter->GetVelocity().IsNearlyZero())
+        {
+            bPendingRestoreAiming = false;
+            float Dist = FVector::Dist(MyCharacter->GetActorLocation(), RunTarget->GetActorLocation());
+            if (Dist <= MyCharacter->GetBattlePerceptionRange())
+            {
+                if (FacingComp->GetCurrentFacingMode() != EFacingMode::Aiming)
+                {
+                    FacingComp->SetAimTarget(RunTarget);
+                }
+            }
+        }
+    }
+
+    // ── 4. 自动攻击（移动到技能范围后释放技能）──
+    if (!bPendingAttack) return;
+
     if (!AimTarget)
     {
         bPendingAttack = false;
@@ -52,14 +106,32 @@ void AWorldPlayerController::Tick(float DeltaTime)
     }
 
     float Dist = FVector::Dist(MyCharacter->GetActorLocation(), AimTarget->GetActorLocation());
-    bool bInRange = Dist <= PendingMaxRange + 80.0f;
-    if (bInRange)
+    if (Dist <= PendingMaxRange + 80.0f)
     {
-        USkillSystemComponent* SkillSys = MyCharacter->GetSkillSystem();
-        if (SkillSys)
+        bPendingAttack = false;
+        SkillSys->ActivateNextSkill();
+    }
+}
+
+void AWorldPlayerController::SetPlayerState(EPlayerState NewState)
+{
+    if (CurrentPlayerState == NewState) return;
+
+    APlayerCharacter* MyCharacter = Cast<APlayerCharacter>(GetPawn());
+    EPlayerState OldState = CurrentPlayerState;
+    CurrentPlayerState = NewState;
+
+    if (NewState == EPlayerState::Default)
+    {
+        // 退出战斗状态：清除注视目标、取消待攻击与奔跑恢复标志
+        bPendingAttack = false;
+        bPendingRestoreAiming = false;
+        if (MyCharacter)
         {
-            bPendingAttack = false;
-            SkillSys->ActivateNextSkill();
+            if (UFacingComponent* FacingComp = MyCharacter->GetFacingComponent())
+            {
+                FacingComp->ClearAimTarget();
+            }
         }
     }
 }
@@ -88,91 +160,114 @@ void AWorldPlayerController::OnLeftMouseClick()
 
 void AWorldPlayerController::OnRightMouseClick()
 {
-	if (!ClickDetectionComponent)
-	{
-		return;
-	}
+    if (!ClickDetectionComponent) return;
 
-	APlayerCharacter* MyCharacter = Cast<APlayerCharacter>(GetPawn());
-	if (!MyCharacter)
-	{
-		return;
-	}
+    APlayerCharacter* MyCharacter = Cast<APlayerCharacter>(GetPawn());
+    if (!MyCharacter) return;
 
-	USkillSystemComponent* SkillSys = MyCharacter->GetSkillSystem();
-	UFacingComponent* FacingComp = MyCharacter->GetFacingComponent();
+    USkillSystemComponent* SkillSys = MyCharacter->GetSkillSystem();
+    UFacingComponent* FacingComp = MyCharacter->GetFacingComponent();
+    UCharacterMovementComponent* MoveComp = MyCharacter->GetCharacterMovement();
+    if (!SkillSys || !FacingComp || !MoveComp) return;
 
-	// 执行点击检测
-	FClickHitResult ClickResult = ClickDetectionComponent->DetectMouseClick(false);
+    // Shift键检测（奔跑）
+    bool bShiftDown = IsInputKeyDown(EKeys::LeftShift);
 
-	// 更新 LastClickTarget
-	if (ClickResult.bHitSuccess)
-	{
-		LastClickTarget = ClickResult.HitLocation;
-	}
+    // 执行点击检测
+    FClickHitResult ClickResult = ClickDetectionComponent->DetectMouseClick(false);
 
-	// ── 处理点击敌人 ──
-	AEnemyCharacter* ClickedEnemy = Cast<AEnemyCharacter>(ClickResult.HitActor.Get());
-	if (ClickedEnemy && SkillSys)
-	{
-		// 设置注视目标
-		if (FacingComp)
-			FacingComp->SetAimTarget(ClickedEnemy);
-		LastClickTarget = ClickedEnemy->GetActorLocation();
+    // 更新 LastClickTarget
+    if (ClickResult.bHitSuccess)
+    {
+        LastClickTarget = ClickResult.HitLocation;
+    }
 
-		float MaxRange = SkillSys->GetMaxSkillRange();
-		ESkillCategory NextCat = SkillSys->GetNextSkillCategory();
+    // ── 处理点击敌人 ──
+    AEnemyCharacter* ClickedEnemy = Cast<AEnemyCharacter>(ClickResult.HitActor.Get());
+    if (ClickedEnemy)
+    {
+        // 锁定敌人 → 进入战斗状态
+        FacingComp->SetAimTarget(ClickedEnemy);
+        SetPlayerState(EPlayerState::Battle);
+        LastClickTarget = ClickedEnemy->GetActorLocation();
 
-		// 位移/辅助技能 → 直接执行（不受距离约束）
-		if (NextCat == ESkillCategory::Movement || NextCat == ESkillCategory::Utility)
-		{
-			bPendingAttack = false;
-			SkillSys->ActivateNextSkill();
-			return;
-		}
+        // 设置移动速度
+        MoveComp->MaxWalkSpeed = bShiftDown ? MyCharacter->GetRunSpeed() : MyCharacter->GetWalkSpeed();
 
-		// 非移动技能：检查距离
-		float Dist = FVector::Dist(MyCharacter->GetActorLocation(), ClickedEnemy->GetActorLocation());
+        float MaxRange = SkillSys->GetMaxSkillRange();
+        ESkillCategory NextCat = SkillSys->GetNextSkillCategory();
 
-		if (MaxRange > 0 && Dist > MaxRange)
-		{
-			// 超出攻击范围 → 走近后自动攻击
-			bPendingAttack = true;
-			PendingMaxRange = MaxRange;
-			MyCharacter->MoveToLocation(ClickedEnemy->GetActorLocation());
-			return;
-		}
+        // 位移/辅助技能 → 直接执行（不受距离约束）
+        if (NextCat == ESkillCategory::Movement || NextCat == ESkillCategory::Utility)
+        {
+            bPendingAttack = false;
+            SkillSys->ActivateNextSkill();
+            return;
+        }
 
-		// 在攻击范围内 → 直接攻击
-		bPendingAttack = false;
-		SkillSys->ActivateNextSkill();
-		return;
-	}
+        // 非移动技能：检查距离
+        float Dist = FVector::Dist(MyCharacter->GetActorLocation(), ClickedEnemy->GetActorLocation());
+        if (MaxRange > 0 && Dist > MaxRange)
+        {
+            // 超出攻击范围 → 走近后自动攻击
+            bPendingAttack = true;
+            PendingMaxRange = MaxRange;
+            if (UAnimInstance* AnimInst = MyCharacter->GetMesh()->GetAnimInstance())
+            {
+                AnimInst->Montage_Stop(0.1f);
+            }
+            MyCharacter->MoveToLocation(ClickedEnemy->GetActorLocation());
+            return;
+        }
 
-	// ── 点击地面：位移/辅助/复合技能直接执行（跳跃到目标位置或冲锋等）──
-	if (ClickResult.bHitSuccess && SkillSys)
-	{
-		ESkillCategory NextCat = SkillSys->GetNextSkillCategory();
-		if (NextCat == ESkillCategory::Movement || NextCat == ESkillCategory::Hybrid || NextCat == ESkillCategory::Utility)
-		{
-			bPendingAttack = false;
-			SkillSys->ActivateNextSkill();
-			return;
-		}
-	}
+        // 在范围内 → 直接攻击
+        bPendingAttack = false;
+        SkillSys->ActivateNextSkill();
+        return;
+    }
 
-	// ── 点击地面 → 移动 ──
-	if (ClickResult.bHitSuccess)
-	{
-		if (FacingComp && FacingComp->GetCurrentFacingMode() == EFacingMode::Aiming)
-		{
-			MyCharacter->GetCharacterMovement()->MaxWalkSpeed = 600.0f;
-			MyCharacter->SetAimingFullSpeed(true);
-		}
-		else if (FacingComp)
-		{
-			MyCharacter->SetAimingFullSpeed(false);
-		}
-		MyCharacter->MoveToLocation(ClickResult.HitLocation);
-	}
+    // ── 点击地面 ──
+    if (ClickResult.bHitSuccess)
+    {
+        ESkillCategory NextCat = SkillSys->GetNextSkillCategory();
+        bool bIsMovementSkill = (NextCat == ESkillCategory::Movement ||
+                                 NextCat == ESkillCategory::Hybrid ||
+                                 NextCat == ESkillCategory::Utility);
+
+        // 位移/辅助/复合技能 → 直接执行
+        if (bIsMovementSkill)
+        {
+            bPendingAttack = false;
+            SkillSys->ActivateNextSkill();
+            return;
+        }
+
+        // ── 非技能移动 ──
+        if (CurrentPlayerState == EPlayerState::Battle)
+        {
+            if (bShiftDown)
+            {
+                // 战斗状态 + Shift奔跑：临时切为行走模式，面朝移动方向
+                MoveComp->bOrientRotationToMovement = true;
+                MoveComp->MaxWalkSpeed = MyCharacter->GetRunSpeed();
+                bPendingRestoreAiming = true;
+            }
+            else
+            {
+                // 战斗状态 + 普通行走：保持注视模式，面朝敌人
+                MoveComp->MaxWalkSpeed = MyCharacter->GetWalkSpeed();
+            }
+        }
+        else
+        {
+            // 默认状态
+            MoveComp->MaxWalkSpeed = bShiftDown ? MyCharacter->GetRunSpeed() : MyCharacter->GetWalkSpeed();
+        }
+
+        if (UAnimInstance* AnimInst = MyCharacter->GetMesh()->GetAnimInstance())
+        {
+            AnimInst->Montage_Stop(0.1f);
+        }
+        MyCharacter->MoveToLocation(ClickResult.HitLocation);
+    }
 }

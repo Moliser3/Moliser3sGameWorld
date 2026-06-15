@@ -50,7 +50,7 @@ public:
 	void PlaySkillMontage(AActor* Instigator);
 
 	/** 技能名称（用于调试和显示） */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill", meta = (DisplayName = "技能名称"))
 	FName SkillName;
 
 	/** 前摇 — 技能起手阶段时长（秒），此阶段不可打断 */
@@ -70,14 +70,14 @@ public:
 	float MaxSkillRange = 100.0f;
 
 	/** 技能分类（攻击/位移/辅助/复合），决定在控制器中如何响应点击 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill", meta = (DisplayName = "技能分类"))
 	ESkillCategory SkillCategory = ESkillCategory::Attack;
 
 	/** 技能蒙太奇（动画） */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill|Animation")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill|Animation", meta = (DisplayName = "技能蒙太奇"))
 	TObjectPtr<UAnimMontage> SkillMontage = nullptr;
 
 	/** 蒙太奇槽位名称（如 DefaultSlot、UpperBody 等） */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill|Animation")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill|Animation", meta = (DisplayName = "蒙太奇槽位名称"))
 	FName MontageSlotName = NAME_None;
 };

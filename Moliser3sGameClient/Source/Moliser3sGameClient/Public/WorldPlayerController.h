@@ -11,8 +11,15 @@ class UInputMappingContext;
 class UCameraControllerComponent;
 
 /**
- * 
+ * 玩家状态
  */
+UENUM(BlueprintType)
+enum class EPlayerState : uint8
+{
+    Default UMETA(DisplayName = "默认状态"),
+    Battle  UMETA(DisplayName = "战斗状态")
+};
+
 UCLASS()
 class MOLISER3SGAMECLIENT_API AWorldPlayerController : public APlayerController
 {
@@ -47,8 +54,15 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Click")
     void SetLastClickTarget(const FVector& NewTarget) { LastClickTarget = NewTarget; }
 
+    /** 获取当前玩家状态 */
+    UFUNCTION(BlueprintPure, Category = "State")
+    EPlayerState GetPlayerState() const { return CurrentPlayerState; }
+
 protected:
     virtual void BeginPlay() override;
+
+    /** 设置玩家状态 */
+    void SetPlayerState(EPlayerState NewState);
 
     /** 默认输入映射上下文 - 在蓝图中赋值 */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
@@ -72,4 +86,14 @@ protected:
 
     /** 待攻击的最大距离目标参数 */
     float PendingMaxRange = 0.0f;
+
+    /** 当前玩家状态 */
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State")
+    EPlayerState CurrentPlayerState = EPlayerState::Default;
+
+    /** 上一帧是否处于技能执行中（非Idle），用于检测技能结束恢复注视 */
+    bool bPreviousSkillActive = false;
+
+    /** 是否等待Shift奔跑结束后的注视恢复 */
+    bool bPendingRestoreAiming = false;
 };

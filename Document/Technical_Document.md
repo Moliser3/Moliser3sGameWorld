@@ -2,7 +2,7 @@
 
 > 引擎：Unreal Engine 5.7  
 > 语言：C++  
-> 最后更新：2026/06/14 22:45
+> 最后更新：2026/06/15 14:00
 
 ---
 
@@ -89,6 +89,52 @@ Build.bat Moliser3sGameClientEditor Win64 Development -Project="项目路径\Mol
 ---
 
 ## 三、系统详解
+
+### 3.0 玩家状态系统
+
+#### 3.0.1 状态枚举
+
+```cpp
+UENUM(BlueprintType)
+enum class EPlayerState : uint8
+{
+    Default UMETA(DisplayName = "默认状态"),   // 默认行走/奔跑
+    Battle  UMETA(DisplayName = "战斗状态")    // 锁定敌人，技能循环
+};
+```
+
+#### 3.0.2 状态转移
+
+```
+Default ──[右键点击敌人]──→ Battle
+Battle  ──[敌人超出战斗感知范围 或 目标丢失]──→ Default
+```
+
+#### 3.0.3 各状态行为
+
+**默认状态：**
+| 操作 | 行为 |
+|------|------|
+| 右键点击地面 | MoveToLocation，速度 300（行走） |
+| Shift + 右键点击地面 | MoveToLocation，速度 600（奔跑） |
+| 右键点击敌人 | 锁定敌人 → Battle 状态，移向敌人（Shift 奔跑/默认行走），到技能范围后自动攻击 |
+
+**战斗状态：**
+| 操作 | 行为 |
+|------|------|
+| 右键点击敌人 | 循环释放技能（复用原有 `ActivateNextSkill`） |
+| 右键点击地面（默认） | MoveToLocation，保持 Aiming 模式（面朝敌人），速度 300 |
+| Shift + 右键点击地面 | MoveToLocation，临时 Walking 模式（面朝移动方向），速度 600；到达后恢复 Aiming 模式面朝敌人 |
+| 位移/复合技能点击地面 | 直接执行技能，结束后自动恢复 Aiming 模式面朝敌人 |
+
+#### 3.0.4 战斗感知范围
+- `PlayerCharacter.BattlePerceptionRange`（蓝图可配置，默认 1500cm）
+- 战斗中玩家与锁定敌人的距离超出此值 → 自动切回默认状态，清除注视目标
+
+#### 3.0.5 相关文件
+- `WorldPlayerController.h/.cpp`：状态管理、右键点击分发
+- `PlayerCharacter.h`：`BattlePerceptionRange` 参数
+- `FacingComponent.cpp`：移除距离自动清除注视（由 Controller 统一管理）
 
 ### 3.1 技能系统
 
@@ -386,6 +432,7 @@ LinkWindow
 
 | 日期 | 修改内容 | 涉及文件 |
 |------|---------|---------|
+| 06/15 | **[新增] 玩家行为状态系统**：EPlayerState(Default/Battle) + Shift奔跑 + 战斗感知范围 | WorldPlayerController.h/.cpp, PlayerCharacter.h/.cpp, FacingComponent.cpp |
 | 06/14 | **[重构] 技能系统三段式重构**：前摇/技能触发/后摇/衔接时间，替换 Duration/DamageAt/InterruptibleAt 线性模型 | SkillBase.h/.cpp, DamageSkillBase.h/.cpp, SkillSystemComponent.h/.cpp, MeleeSlashSkill.h/.cpp, JumpSkill.h/.cpp, PlayerCharacter.cpp, SkillTypes.h |
 | 06/14 | **[新增] 技能组系统 + 衔接时间 + 1 技能自循环** | SkillSystemComponent.h/.cpp |
 | 06/14 | **[重命名] bIsMovementSkill → ESkillCategory** | SkillBase.h, SkillTypes.h, SkillSystemComponent.h/.cpp, WorldPlayerController.cpp, JumpSkill.cpp |
