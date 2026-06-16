@@ -2,7 +2,7 @@
 
 > 引擎：Unreal Engine 5.7  
 > 语言：C++  
-> 最后更新：2026/06/15 14:00
+> 最后更新：2026/06/15 18:30
 
 ---
 
@@ -23,13 +23,13 @@ Moliser3sGameClient/Source/
 │   ├── Facing/                   # 朝向控制组件
 │   ├── Input/                    # 点击检测组件
 │   ├── Camera/                   # 摄像机控制器组件
-│   └── Skill/                    # 技能系统组件（状态机）
+│   └── Skill/                    # 技能系统组件（双技能组状态机）
 └── Skill/
-    ├── SkillTypes.h              # 枚举定义（ESkillCategory）
-    ├── SkillBase.h/.cpp          # 技能基类（前摇/后摇/衔接时间）
+    ├── SkillTypes.h              # 枚举定义 + FSkillStage 结构体
+    ├── SkillBase.h/.cpp          # 技能基类（Stages 数组，多阶段）
     ├── DamageSkillBase.h/.cpp    # 伤害技能中间类
-    ├── MeleeSlashSkill.h/.cpp    # 扇形斩击技能
-    └── JumpSkill.h/.cpp          # 跳跃技能（抛物线位移）
+    ├── MeleeSlashSkill.h/.cpp    # 扇形斩击技能（从Stage读取伤害参数）
+    └── JumpSkill.h/.cpp          # 跳跃技能（抛物线位移，Stages[0]）
 ```
 
 ### 1.2 编译方式
@@ -115,61 +115,98 @@ Battle  ──[敌人超出战斗感知范围 或 目标丢失]──→ Default
 **默认状态：**
 | 操作 | 行为 |
 |------|------|
-| 右键点击地面 | MoveToLocation，速度 300（行走） |
-| Shift + 右键点击地面 | MoveToLocation，速度 600（奔跑） |
-| 右键点击敌人 | 锁定敌人 → Battle 状态，移向敌人（Shift 奔跑/默认行走），到技能范围后自动攻击 |
+| 左键点击地面 | MoveToLocation，速度 300（行走） |
+| Shift + 左键点击地面 | MoveToLocation，速度 600（奔跑） |
+| 左键点击敌人 | 锁定敌人 → Battle 状态，移向敌人（Shift 奔跑/默认行走），到技能范围后 `ActivateLeft()` |
+| 右键点击敌人/地面 | 锁定敌人(如点击敌人) → Battle 状态，直接释放右键技能 `ActivateRight()`，无距离检查 |
+| 右键点击地面（战斗状态） | 不退出战斗状态，直接释放右键技能 |
 
 **战斗状态：**
 | 操作 | 行为 |
 |------|------|
-| 右键点击敌人 | 循环释放技能（复用原有 `ActivateNextSkill`） |
-| 右键点击地面（默认） | MoveToLocation，保持 Aiming 模式（面朝敌人），速度 300 |
-| Shift + 右键点击地面 | MoveToLocation，临时 Walking 模式（面朝移动方向），速度 600；到达后恢复 Aiming 模式面朝敌人 |
-| 位移/复合技能点击地面 | 直接执行技能，结束后自动恢复 Aiming 模式面朝敌人 |
+| 左键点击地面（非 Shift） | MoveToLocation，保持 Aiming 模式（面朝敌人），速度 300；超距则退出战斗状态 |
+| Shift + 左键点击地面 | MoveToLocation，临时 Walking 模式（面朝移动方向），速度 600；到达后恢复 Aiming 模式面朝敌人 |
+| 左键点击敌人 | 距离检查 → 超距移动，在范围内 `ActivateLeft()` |
+| 右键点击敌人/地面 | 直接释放右键技能 `ActivateRight()`，不退出战斗状态 |
+| 右键技能结束 | 自动恢复 Aiming 模式面朝敌人 |
 
 #### 3.0.4 战斗感知范围
 - `PlayerCharacter.BattlePerceptionRange`（蓝图可配置，默认 1500cm）
 - 战斗中玩家与锁定敌人的距离超出此值 → 自动切回默认状态，清除注视目标
 
 #### 3.0.5 相关文件
-- `WorldPlayerController.h/.cpp`：状态管理、右键点击分发
+- `WorldPlayerController.h/.cpp`：状态管理、左/右键点击分发、Alt防御
 - `PlayerCharacter.h`：`BattlePerceptionRange` 参数
 - `FacingComponent.cpp`：移除距离自动清除注视（由 Controller 统一管理）
+
+#### 3.0.6 Alt 防御
+- `OnAltPressed()`：设置 `bDefending = true`
+- `OnAltReleased()`：设置 `bDefending = false`
+- 蓝图输入事件绑定 Alt 键
 
 ### 3.1 技能系统
 
 #### 3.1.1 核心概念
 
 ```
-技能生命周期（三段式）：
-[Execute] ───前摇(Windup)──→ [OnExecute] ───后摇(Recovery)──→ [LinkWindow] ──超时→ [Idle]
-    ↑                           ↑ 激发瞬间                  ↑
-  点击触发                    伤害/效果触发              衔接等待
- 不可打断                    前摇不可打断              可点击推进到下一技能
-                              后摇可打断打断           超时重置索引到 0
+技能多阶段生命周期：
+每个技能有 N 个阶段（FSkillStage），阶段推进按技能类型（ESkillType）连续出现次数
+
+组索引推进（每次点击+1）：
+[A][A][A][B][B][A][B]
+A_0 A_1 A_2 B_0 B_1 A_0 B_0
+
+阶段推进规则：
+  当前 SkillType == 上一个 SkillType → StageForType++
+  当前 SkillType != 上一个 SkillType → StageForType = 0
 ```
 
 #### 3.1.2 核心组件
 
-- **`ESkillCategory`**：技能分类枚举（Attack/Movement/Utility/Hybrid），决定控制器响应行为
-- **`USkillBase`**：技能基类，定义前摇/后摇/衔接时间参数和生命周期虚函数
+- **`ESkillType`**：技能类型枚举（None/直拳/勾拳等），用于阶段追踪和对比
+- **`FSkillStage`**：技能阶段结构体，包含前摇/后摇/衔接时间/蒙太奇/伤害参数/扇形角/高度差
+- **`USkillBase`**：技能基类，持有 `TArray<FSkillStage> Stages` 数组
 - **`UDamageSkillBase`**：伤害技能中间类，持有 `ApplyDamage()` 方法
-- **`USkillSystemComponent`**：技能系统核心，管理技能组和阶段状态机
-- **`UMeleeSlashSkill`**：扇形斩击，`OnExecute()` 触发范围伤害
-- **`UJumpSkill`**：跳跃技能，前摇=抛物线飞行，后摇=落地收尾
+- **`USkillSystemComponent`**：双技能组（Left/Right），各自独立索引和阶段追踪
+- **`UMeleeSlashSkill`**：扇形斩击，`OnExecute()` 触发，从 `Stages[CurrentStage]` 读取伤害参数
+- **`UJumpSkill`**：跳跃技能，阶段参数在 `Stages[0]` 中
 
 #### 3.1.3 USkillBase
 
-| 属性 | 类型 | 默认值 | 蓝图 DisplayName | 说明 |
-|------|------|--------|-----------------|------|
-| `SkillName` | `FName` | — | — | 技能名称 |
-| `WindupTime` | `float` | 0.3 | **前摇** | 技能起手阶段时长（秒），不可打断 |
-| `RecoveryTime` | `float` | 0.5 | **后摇** | 技能收尾阶段时长（秒），可被打断 |
-| `CustomLinkTime` | `float` | 0.2 | **衔接时间** | 后摇结束后额外等待时长，超时重置索引 |
-| `MaxSkillRange` | `float` | 100.0 | **最大释放技能距离** | -1=无限制（远程/位移）；
-| `SkillCategory` | `ESkillCategory` | Attack | — | 技能分类 |
-| `SkillMontage` | `UAnimMontage*` | nullptr | — | 技能蒙太奇动画 |
-| `MontageSlotName` | `FName` | NAME_None | — | 蒙太奇槽位名称 |
+| 属性 | 类型 | DisplayName | 说明 |
+|------|------|-------------|------|
+| `SkillName` | `FName` | 技能名称 | 技能名称标识 |
+| `SkillType` | `ESkillType` | 技能类型 | 系统据此追踪阶段 |
+| `MaxSkillRange` | `float` | 最大释放技能距离 | -1=无限制 |
+| `SkillCategory` | `ESkillCategory` | 技能分类 | Attack/Movement/Utility/Hybrid |
+| `Stages` | `TArray<FSkillStage>` | 技能阶段列表 | 每个阶段独立配置 |
+
+| 虚函数 | 调用时机 | 说明 |
+|--------|---------|------|
+| `Execute(Instigator)` | 前摇开始时 | 播放当前阶段蒙太奇、初始化状态 |
+| `OnWindupUpdate(Instigator, DeltaTime)` | 前摇每帧 | 抛物线位移、蓄力等 |
+| `OnExecute(Instigator)` | 前摇→后摇切换帧 | 激发瞬间，伤害/落地 |
+| `OnRecoveryUpdate(Instigator, DeltaTime)` | 后摇每帧 | 收尾动画更新 |
+| `OnInterrupt(Instigator)` | 后摇被点击打断时 | 清理运行时状态 |
+
+**FSkillStage 结构体字段：**
+
+| 字段 | 类型 | DisplayName | 说明 |
+|------|------|-------------|------|
+| `WindupTime` | float | 前摇 | 阶段起手时间 |
+| `RecoveryTime` | float | 后摇 | 阶段收尾时间 |
+| `CustomLinkTime` | float | 衔接时间 | 后摇后额外等待 |
+| `SkillMontage` | UAnimMontage* | 蒙太奇 | 阶段动画 |
+| `MontageSlotName` | FName | 蒙太奇槽位 | 槽位名称 |
+| `BaseDamage` | float | 基础伤害 | 阶段伤害 |
+| `HalfAngleDeg` | float | 扇形半角 | 扇形检测角度 |
+| `MaxZDiff` | float | 最大高度差 | 高度容差 |
+
+**PlaySkillMontage(Instigator) 流程：**
+1. 验证 Instigator 和 `Stages[CurrentStage].SkillMontage`
+2. 获取 Character → GetMesh() → GetAnimInstance()
+3. 调用 `Montage_Stop(0.2f)` — 停止所有蒙太奇
+4. 调用 `Montage_Play(SkillMontage, 1.0f)`
 
 | 虚函数 | 调用时机 | 说明 |
 |--------|---------|------|
@@ -218,10 +255,10 @@ virtual void ApplyDamage(AActor* Instigator);
 | `JumpHeight` | 200.0 | 抛物线最高点（厘米） |
 
 **生命周期（不可打断=前摇, 可打断=后摇）：**
-- **前摇（WindupTime=0.72s）**：抛物线位移，`OnWindupUpdate()` Tick 驱动
+- **前摇（WindupTime=0.72s，Stages[0]）**：抛物线位移，`OnWindupUpdate()` Tick 驱动
 - **技能触发**：`OnExecute()` → 落地，通知摄像机恢复
-- **后摇（RecoveryTime=1.35s）**：落地收尾动画，可被玩家打断
-- **衔接时间（CustomLinkTime=0.2s）**：超时后索引重置
+- **后摇（RecoveryTime=1.35s，Stages[0]）**：落地收尾动画，可被玩家打断
+- **衔接时间（CustomLinkTime=0.2s，Stages[0]）**：超时后索引重置
 
 **Execute 流程：**
 1. 从 `WorldPlayerController::GetLastClickTarget()` 读取目标位置
@@ -232,7 +269,7 @@ virtual void ApplyDamage(AActor* Instigator);
 6. 碰撞检测 → 撞到障碍物提前落地
 7. 前摇结束 → `OnExecute()` → 落地 → 进入后摇
 
-> `FlyDuration` 移除，由 `WindupTime` 替代。`GetInterruptibleAt()` 移除，前摇天然不可打断。
+> 阶段参数（WindupTime/RecoveryTime/CustomLinkTime）已移入 `Stages[0]`。
 
 #### 3.1.7 USkillSystemComponent 状态机
 
@@ -244,16 +281,16 @@ enum class ESkillPhase : uint8
     Idle,       // 空闲
     Windup,     // 前摇（不可打断）
     Recovery,   // 后摇（可打断）
-    LinkWindow  // 衔接等待（可点击推进到下一技能，超时重置索引）
+    LinkWindow  // 衔接等待
 };
 ```
 
 **状态流转：**
 
 ```
-                       ActivateNextSkill()
-                             │
-                             ▼
+                    ActivateLeft() / ActivateRight()
+                              │
+                              ▼
   ┌────────┐  点击   ┌──────────┐
   │  Idle  │───────→│  Windup   │ WindupTime 到 → OnExecute → Recovery
   └────────┘        └──────────┘
@@ -269,70 +306,87 @@ enum class ESkillPhase : uint8
        │           └────┬─────┘
        │                │ CachedLinkDuration 超时
        │                ▼
-       └───────── GroupSkillIndex = 0 ──→ Idle
+       └────── 重置左右组阶段追踪归零 ──→ Idle
 ```
 
-**ActivateNextSkill() 逻辑：**
+**双技能组：**
+
+```cpp
+// 左键技能组（普通攻击）
+UPROPERTY(EditDefaultsOnly, Instanced, Category = "LeftSkill")
+TArray<TObjectPtr<USkillBase>> LeftSkillGroup;
+
+// 右键技能组
+UPROPERTY(EditDefaultsOnly, Instanced, Category = "RightSkill")
+TArray<TObjectPtr<USkillBase>> RightSkillGroup;
+
+int32 LeftGroupIndex = 0;     // 左组索引
+int32 RightGroupIndex = 0;    // 右组索引
+
+ESkillType LeftLastSkillType;  // 左组上一技能类型
+int32 LeftStageForType;        // 左组当前技能类型阶段进度
+// 右组同理
+```
+
+**阶段推进规则（ExecuteSkillFromGroup 核心逻辑）：**
 
 ```
 switch SkillPhase:
     Windup     → return（前摇不可打断）
     Recovery   → OnInterrupt() → 清当前技能 → 继续
-    Idle       → 继续
-    LinkWindow → 继续
+    Idle/LinkWindow → 继续
 
-组内取下一技能（1 技能时索引永远指向自己）
-CurrentSkill = Skill, Phase = Windup, PhaseStartTime = Now
+组内取 Group[Index]
+判断阶段：
+  Skill->SkillType == LastSkillType → StageForType++
+  Skill->SkillType != LastSkillType → StageForType = 0
+LastSkillType = Skill->SkillType
+
+Skill->SetCurrentStage(StageForType)
 Skill->Execute(Owner)
-if SkillGroup.Num() > 1 → GroupSkillIndex 推进
+Index = (Index + 1) % Group.Num()   // 组索引每次推进
 ```
 
-#### 3.1.8 技能组
-
-```cpp
-// 当前唯一的技能组（预留多组扩展）
-UPROPERTY(EditDefaultsOnly, Instanced, Category = "Skills")
-TArray<TObjectPtr<USkillBase>> SkillGroup;
-
-int32 GroupSkillIndex = 0;     // 组内技能索引
-int32 CurrentGroupIndex = 0;   // 当前技能组索引（预留）
-```
-
-**索引推进规则：**
-
-| 场景 | 行为 |
-|------|------|
-| 1 技能组 | `GroupSkillIndex` 始终为 0（可自打断自循环） |
-| 多技能组 + 衔接时间内 | 点击推进到下一技能 |
-| 多技能组 + 衔接超时 | `GroupSkillIndex = 0` 重置到第一个 |
-
-> 衔接时间 = `RecoveryTime + CustomLinkTime`，组件在 Recovery 结束时缓存 `CachedLinkDuration`
+**衔接超时行为：**
+- LeftGroupIndex/RightGroupIndex 归零
+- LeftStageForType/RightStageForType 归零
+- LeftLastSkillType/RightLastSkillType 重置为 None
 
 ### 3.2 输入系统
 
-#### 3.2.1 鼠标右键（全功能）
+#### 3.2.1 鼠标左键
 
 ```
-右键点击（IA_RightClick Triggered）
+左键点击（IA_LeftClick Triggered）
   ↓
 ClickDetectionComponent->DetectMouseClick(false)
   ↓
 [点击敌人]
-  ├─ 获取 NextSkillCategory
-  ├─ Movement/Utility → ActivateNextSkill()
-  └─ Attack/Hybrid → 距离检查
-      ├─ 在范围内 → ActivateNextSkill()
-      └─ 超出范围 → bPendingAttack + MoveToLocation
+  ├─ SetAimTarget + Enter Battle
+  ├─ 检查左键技能 MaxSkillRange
+  ├─ 超距 → bPendingAttack + MoveToLocation
+  └─ 在范围 → ActivateLeft()
 
 [点击地面]
-  ├─ 获取 NextSkillCategory
-  ├─ Movement/Hybrid/Utility → ActivateNextSkill()
-  └─ 其他 → MoveToLocation()
+  ├─ 战斗状态 + Shift → 奔跑，面朝移动方向，到达后恢复注视
+  ├─ 战斗状态 + 无 Shift → 行走，面朝敌人
+  ├─ 默认状态 + Shift → 奔跑
+  └─ 默认状态 + 无 Shift → 行走
 ```
 
-#### 3.2.2 鼠标左键
+#### 3.2.2 鼠标右键
 
-已闲置，可由蓝图解除绑定。
+```
+右键点击（IA_RightClick Triggered）
+  ↓
+[点击敌人] → SetAimTarget + Enter Battle
+  ↓
+直接 ActivateRight() — 无距离检查，方向指向点击位置
+
+[点击地面] → 记录 LastClickTarget
+  ↓
+直接 ActivateRight()
+```
 
 ### 3.3 朝向系统
 
@@ -355,76 +409,109 @@ ClickDetectionComponent->DetectMouseClick(false)
 
 ## 四、数据流
 
-### 右键攻击处理流程
+### 左键攻击处理流程
+
+```
+左键点击敌人
+  │
+  ├─ SetAimTarget + Enter Battle
+  ├─ GetMaxSkillRange() 距离检查
+  │   ├─ 超距 → bPendingAttack + MoveToLocation
+  │   └─ 在范围 → ActivateLeft()
+  │
+  ▼
+ActivateLeft()
+  ├─ Windup → return
+  ├─ Recovery → OnInterrupt()
+  ├─ Idle/LinkWindow → 继续
+  │
+  ▼
+ExecuteSkillFromGroup(LeftSkillGroup, LeftGroupIndex, LeftLastType, LeftStageForType)
+  ├─ 取 LeftGroup[LeftGroupIndex]
+  ├─ Stage判定（连续同类型推进）
+  ├─ Skill->SetCurrentStage(StageForType)
+  └─ Skill->Execute(Owner) → Windup 开始
+```
+
+### 右键释放流程
 
 ```
 右键点击
   │
-  ├─ 控制器判断 NextSkillCategory
-  │   ├─ Movement/Utility → ActivateNextSkill()
-  │   └─ Attack → 距离检查
+  ├─ 点击敌人 → SetAimTarget + Enter Battle
+  └─ 记录 LastClickTarget 为方向
   │
   ▼
-ActivateNextSkill()
-  ├─ Windup → return
-  ├─ Recovery → OnInterrupt()，继续
-  ├─ Idle/LinkWindow → 继续
-  │
-  ▼
+ActivateRight()
+  └─ ExecuteSkillFromGroup(RightSkillGroup, RightGroupIndex, RightLastType, RightStageForType)
+      ├─ 取 RightGroup[RightGroupIndex]
+      ├─ 无距离检查（立即释放）
+      ├─ Stage判定（连续同类型推进）
+      ├─ Skill->SetCurrentStage(StageForType)
+      └─ Skill->Execute(Owner) → Windup 开始
+```
+
+### 技能执行生命周期（共享）
+
+```
 Skill->Execute(Owner) → Windup 开始
   │
   ▼
 TickComponent (Windup)
   ├─ OnWindupUpdate() → 抛物线/蓄力
-  └─ WindupTime 到 → OnExecute() → 伤害/落地 → Recovery
+  └─ GetWindupTime() 到 → OnExecute() → 伤害/落地 → Recovery
   │
   ▼
 TickComponent (Recovery)
   ├─ OnRecoveryUpdate() → 收尾动画
-  ├─ 右键点击 → OnInterrupt() → 下一技能 Windup
-  └─ RecoveryTime 到 → LinkWindow
+  ├─ 点击 → OnInterrupt() → 下一技能 Windup
+  └─ GetRecoveryTime() 到 → LinkWindow
   │
   ▼
 LinkWindow
-  ├─ 右键点击 → 下一技能 Windup
-  └─ CachedLinkDuration 超时 → GroupSkillIndex=0 → Idle
+  ├─ 点击 → 下一技能 Windup
+  └─ CachedLinkDuration 超时 → 重置左右组追踪 → Idle
 ```
 
 ---
 
 ## 五、蓝图配置指引
 
-### 5.1 技能配置
+### 5.1 双技能组配置
 
 在角色蓝图中：
 1. 选中 `SkillSystemComponent`
-2. 在 `Skills > SkillGroup` 中添加技能实例
-3. 配置每个技能实例的参数
+2. 在 `LeftSkill` > `LeftSkillGroup` 中添加左键技能实例
+3. 在 `RightSkill` > `RightSkillGroup` 中添加右键技能实例
+4. 配置每个技能实例的 `Stages` 数组
 
-**近战技能示例（前摇→技能触发→后摇）：**
+**近战技能阶段配置（直拳/勾拳）：**
 
-| 参数 | DisplayName | 值 | 说明 |
+| 字段 | DisplayName | 说明 |
+|------|------------|------|
+| SkillName | 技能名称 | "直拳" |
+| SkillType | 技能类型 | 设置为对应枚举（StraightPunch/Hook） |
+| MaxSkillRange | 最大释放技能距离 | 攻击判定距离 |
+| SkillCategory | 技能分类 | Attack |
+| Stages[0].WindupTime | 前摇 | 阶段0起手时间 |
+| Stages[0].RecoveryTime | 后摇 | 阶段0收尾时间 |
+| Stages[0].SkillMontage | 蒙太奇 | 阶段0动画 |
+| Stages[0].BaseDamage | 基础伤害 | 阶段0伤害 |
+| Stages[0].HalfAngleDeg | 扇形半角 | 阶段0扇形角度 |
+
+**跳跃技能示例（Stages[0]）：**
+
+| 字段 | DisplayName | 值 | 说明 |
 |------|------------|-----|------|
-| SkillName | — | "出拳" | |
-| **前摇** | 前摇 | 0.3 | 出拳起手时间 |
-| **后摇** | 后摇 | 0.7 | 收拳时间，可打断 |
-| **衔接时间** | 衔接时间 | 0.2 | 后摇后等待时间，超时重置 |
-| 最大释放技能距离 | 最大释放技能距离 | 100 | 1 米攻击距离 |
-| SkillCategory | — | Attack | |
-| SkillMontage | — | [拖入蒙太奇] | |
-
-**跳跃技能示例：**
-
-| 参数 | DisplayName | 值 | 说明 |
-|------|------------|-----|------|
-| SkillName | — | "跳跃" | |
-| **前摇** | 前摇 | 0.72 | 抛物线飞行时间 |
-| **后摇** | 后摇 | 1.35 | 落地收尾时间 |
-| **衔接时间** | 衔接时间 | 0.2 | 落地后等待 |
-| 最大释放技能距离 | 最大释放技能距离 | -1 | 不受距离限制 |
-| SkillCategory | — | Movement | 位移技能 |
-| JumpRange | — | 500 | 最远跳 5 米 |
-| JumpHeight | — | 200 | 最高 2 米 |
+| SkillName | 技能名称 | "跳跃" | |
+| SkillType | 技能类型 | None（暂未分类） | |
+| MaxSkillRange | 最大释放技能距离 | -1 | 不受距离限制 |
+| SkillCategory | 技能分类 | Movement | 位移技能 |
+| Stages[0].WindupTime | 前摇 | 0.72 | 抛物线飞行时间 |
+| Stages[0].RecoveryTime | 后摇 | 1.35 | 落地收尾时间 |
+| Stages[0].CustomLinkTime | 衔接时间 | 0.2 | 落地后等待 |
+| JumpRange | 最大跳跃距离 | 500 | 最远跳 5 米 |
+| JumpHeight | 跳跃最高点高度 | 200 | 最高 2 米 |
 
 ---
 
@@ -432,7 +519,14 @@ LinkWindow
 
 | 日期 | 修改内容 | 涉及文件 |
 |------|---------|---------|
-| 06/15 | **[新增] 玩家行为状态系统**：EPlayerState(Default/Battle) + Shift奔跑 + 战斗感知范围 | WorldPlayerController.h/.cpp, PlayerCharacter.h/.cpp, FacingComponent.cpp |
+| 06/15 | **[重构] 多阶段技能系统 + 双技能组 + 左键恢复 + 变量清理** | 所有技能/组件/控制器文件 |
+| 06/15 | **[新增] 多阶段技能**：FSkillStage + ESkillType + Stages数组，阶段按技能类型连续出现次数推进 | SkillTypes.h, SkillBase.h/.cpp, MeleeSlashSkill.h/.cpp, JumpSkill.h/.cpp |
+| 06/15 | **[新增] 双技能组**：LeftSkillGroup/RightSkillGroup，各自独立索引和阶段追踪 | SkillSystemComponent.h/.cpp |
+| 06/15 | **[新增] 鼠标左键恢复**：OnLeftMouseClick实现，点击地面移动，点击敌人攻击 | WorldPlayerController.h/.cpp |
+| 06/15 | **[变更] 右键简化**：无距离检查，直接释放技能 | WorldPlayerController.cpp |
+| 06/15 | **[新增] Alt防御**：OnAltPressed/OnAltReleased + bDefending | WorldPlayerController.h/.cpp |
+| 06/15 | **[清理] 变量清理**：移除LockedWalkSpeed/LockedRunSpeed/LockOnRange/bAimingFullSpeed | BaseCharacter.h, PlayerCharacter.h/.cpp |
+| 06/15 | **[修复] PlaySkillMontage**：Montage_Stop去掉参数，停止所有蒙太奇 | SkillBase.cpp |
 | 06/14 | **[重构] 技能系统三段式重构**：前摇/技能触发/后摇/衔接时间，替换 Duration/DamageAt/InterruptibleAt 线性模型 | SkillBase.h/.cpp, DamageSkillBase.h/.cpp, SkillSystemComponent.h/.cpp, MeleeSlashSkill.h/.cpp, JumpSkill.h/.cpp, PlayerCharacter.cpp, SkillTypes.h |
 | 06/14 | **[新增] 技能组系统 + 衔接时间 + 1 技能自循环** | SkillSystemComponent.h/.cpp |
 | 06/14 | **[重命名] bIsMovementSkill → ESkillCategory** | SkillBase.h, SkillTypes.h, SkillSystemComponent.h/.cpp, WorldPlayerController.cpp, JumpSkill.cpp |

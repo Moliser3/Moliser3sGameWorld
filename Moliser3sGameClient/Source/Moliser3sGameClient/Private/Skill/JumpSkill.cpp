@@ -16,12 +16,12 @@
 UJumpSkill::UJumpSkill()
 {
 	SkillCategory = ESkillCategory::Movement;
-
-	// 前摇 = 抛物线飞行（不可打断），后摇 = 落地收尾（可打断）
-	WindupTime = 0.72f;
-	RecoveryTime = 1.35f;
-	CustomLinkTime = 0.2f;
 	MaxSkillRange = -1;
+
+	FSkillStage& Stage0 = Stages.AddDefaulted_GetRef();
+	Stage0.WindupTime = 0.72f;
+	Stage0.RecoveryTime = 1.35f;
+	Stage0.CustomLinkTime = 0.2f;
 }
 
 void UJumpSkill::Execute(AActor* Instigator)
@@ -128,12 +128,12 @@ void UJumpSkill::Execute(AActor* Instigator)
 			FVector Point = HPos;
 			Point.Z += VOffset;
 
-			DrawDebugLine(World, PrevPoint, Point, FColor::Green, false, WindupTime, 0, 1.0f);
-			DrawDebugPoint(World, Point, 4.0f, FColor::Green, false, WindupTime);
+			DrawDebugLine(World, PrevPoint, Point, FColor::Green, false, GetWindupTime(), 0, 1.0f);
+			DrawDebugPoint(World, Point, 4.0f, FColor::Green, false, GetWindupTime());
 			PrevPoint = Point;
 		}
-		DrawDebugSphere(World, JumpStartLoc, 15.0f, 8, FColor::Blue, false, WindupTime);
-		DrawDebugSphere(World, JumpTargetLoc, 15.0f, 8, FColor::Red, false, WindupTime);
+		DrawDebugSphere(World, JumpStartLoc, 15.0f, 8, FColor::Blue, false, GetWindupTime());
+		DrawDebugSphere(World, JumpTargetLoc, 15.0f, 8, FColor::Red, false, GetWindupTime());
 	}
 
 	// 初始化跳跃状态
@@ -157,7 +157,7 @@ void UJumpSkill::OnWindupUpdate(AActor* Instigator, float DeltaTime)
 	// 推进跳跃进度（WindupTime 即总飞行时长）
 	if (JumpProgress < 1.0f)
 	{
-		JumpProgress += DeltaTime / WindupTime;
+		JumpProgress += DeltaTime / GetWindupTime();
 		if (JumpProgress > 1.0f)
 		{
 			JumpProgress = 1.0f;
@@ -235,7 +235,7 @@ void UJumpSkill::OnExecute(AActor* Instigator)
 		MoveComp->Velocity = FVector::ZeroVector;
 	}
 
-	UE_LOG(LogTemp, Warning, TEXT("[JumpSkill] Landed, entering recovery (%.2f s)"), RecoveryTime);
+	UE_LOG(LogTemp, Warning, TEXT("[JumpSkill] Landed, entering recovery (%.2f s)"), GetRecoveryTime());
 }
 
 void UJumpSkill::OnInterrupt(AActor* Instigator)

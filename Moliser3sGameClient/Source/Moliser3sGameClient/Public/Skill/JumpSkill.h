@@ -1,23 +1,9 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
 #include "CoreMinimal.h"
 #include "Skill/SkillBase.h"
 #include "JumpSkill.generated.h"
 
-/**
- * 跳跃技能
- * 读取 WorldPlayerController::LastClickTarget 作为目标位置，
- * 沿抛物线从当前位置飞向目标。
- * 目标不可达时原地起跳。
- * 飞行中碰到障碍物则落地。
- *
- * 生命周期：
- *   前摇(Windup) = 抛物线飞行（不可打断）
- *   技能触发(OnExecute) = 落地
- *   后摇(Recovery) = 落地收尾动画（可打断）
- */
 UCLASS(Blueprintable, DefaultToInstanced, EditInlineNew)
 class MOLISER3SGAMECLIENT_API UJumpSkill : public USkillBase
 {
@@ -41,10 +27,7 @@ public:
 	float JumpHeight = 200.0f;
 
 protected:
-	/** 检测目标位置是否可达 */
 	bool IsTargetReachable(AActor* Instigator, const FVector& Target) const;
-
-	// ── 运行时状态 ──
 
 	bool bIsJumping = false;
 	FVector JumpStartLoc = FVector::ZeroVector;
