@@ -41,6 +41,23 @@ void UFacingComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActo
 	}
 }
 
+void UFacingComponent::SetMode(EFacingMode NewMode)
+{
+	if (CurrentFacingMode == NewMode) return;
+
+	CurrentFacingMode = NewMode;
+
+	if (ACharacter* OwnerChar = Cast<ACharacter>(GetOwner()))
+	{
+		if (UCharacterMovementComponent* MoveComp = OwnerChar->GetCharacterMovement())
+		{
+			MoveComp->bOrientRotationToMovement = (NewMode == EFacingMode::Walking);
+		}
+	}
+
+	OnFacingModeChanged.Broadcast(CurrentFacingMode);
+}
+
 void UFacingComponent::SetAimTarget(AActor* Target)
 {
 	if (!Target)

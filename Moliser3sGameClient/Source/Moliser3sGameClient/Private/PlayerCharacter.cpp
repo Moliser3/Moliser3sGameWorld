@@ -3,6 +3,7 @@
 #include "Camera/CameraComponent.h"
 #include "Component/Facing/FacingComponent.h"
 #include "Component/Skill/SkillSystemComponent.h"
+#include "WorldPlayerController.h"
 
 APlayerCharacter::APlayerCharacter()
 {
@@ -27,16 +28,45 @@ void APlayerCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
-	if (FacingComponent)
+	if (AWorldPlayerController* PC = Cast<AWorldPlayerController>(GetController()))
 	{
-		FacingComponent->OnFacingModeChanged.AddDynamic(this, &APlayerCharacter::UpdateMovementSpeed);
+		PC->OnCombatStateChanged.AddDynamic(this, &APlayerCharacter::OnCombatStateChanged);
+		PC->OnActionStateChanged.AddDynamic(this, &APlayerCharacter::OnActionStateChanged);
 	}
 }
 
-void APlayerCharacter::UpdateMovementSpeed(EFacingMode NewMode)
+void APlayerCharacter::OnCombatStateChanged(ECombatState NewCombat)
 {
-	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+	if (NewCombat == ECombatState::BattlePerception)
 	{
+		FacingComponent->SetMode(EFacingMode::Aiming);
+	}
+}
+
+void APlayerCharacter::OnActionStateChanged(EActionState NewAction)
+{
+	UCharacterMovementComponent* MoveComp = GetCharacterMovement();
+	if (!MoveComp) return;
+
+	switch (NewAction)
+	{
+	case EActionState::Idle:
+		MoveComp->MaxWalkSpeed = 0.0f;
+		break;
+
+	case EActionState::Walking:
 		MoveComp->MaxWalkSpeed = GetWalkSpeed();
+		break;
+
+	case EActionState::Running:
+		MoveComp->MaxWalkSpeed = GetRunSpeed();
+		break;
+
+	case EActionState::Skill:
+		if (AController* Ctl = GetController())
+		{
+			Ctl->StopMovement();
+		}
+		break;
 	}
 }

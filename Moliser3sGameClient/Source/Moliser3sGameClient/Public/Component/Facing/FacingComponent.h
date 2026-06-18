@@ -55,6 +55,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Facing")
 	void SetAimTarget(AActor* Target);
 
+	/** 仅切换朝向模式，保留注视目标不变 */
+	UFUNCTION(BlueprintCallable, Category = "Facing")
+	void SetMode(EFacingMode NewMode);
+
 	/** 清除注视目标，回到行走模式 */
 	UFUNCTION(BlueprintCallable, Category = "Facing")
 	void ClearAimTarget();

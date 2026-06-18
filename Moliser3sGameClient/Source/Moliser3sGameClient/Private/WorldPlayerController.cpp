@@ -38,63 +38,47 @@ void AWorldPlayerController::Tick(float DeltaTime)
 
 	AActor* AimTarget = FacingComp->GetAimTarget();
 
-	// ── 1. 战斗状态转移：超出战斗感知范围或无目标 → 默认状态 ──
-	if (CurrentPlayerState == EPlayerState::Battle)
+	// ── 1. 战斗感知状态转移 ──
+	if (CurrentCombatState == ECombatState::BattlePerception)
 	{
 		if (!AimTarget)
 		{
-			SetPlayerState(EPlayerState::Default);
+			SetCombatState(ECombatState::Default);
 		}
 		else
 		{
 			float Dist = FVector::Dist(MyCharacter->GetActorLocation(), AimTarget->GetActorLocation());
 			if (Dist > MyCharacter->GetBattlePerceptionRange())
 			{
-				SetPlayerState(EPlayerState::Default);
+				SetCombatState(ECombatState::Default);
 			}
 		}
 	}
 
-	// ── 2. 技能结束恢复注视 ──
+	// ── 2. 技能结束 → 闲置 ──
 	ESkillPhase CurrentPhase = SkillSys->GetSkillPhase();
-	if (CurrentPlayerState == EPlayerState::Battle && bPreviousSkillActive && CurrentPhase == ESkillPhase::Idle)
+	static bool bPrevSkillActive = false;
+	if (CurrentActionState == EActionState::Skill && bPrevSkillActive && CurrentPhase == ESkillPhase::Idle)
 	{
-		if (UAnimInstance* AnimInst = MyCharacter->GetMesh()->GetAnimInstance())
-		{
-			AnimInst->Montage_Stop(0.1f);
-		}
-		AActor* SkillEndTarget = FacingComp->GetAimTarget();
-		if (SkillEndTarget && FacingComp->GetCurrentFacingMode() != EFacingMode::Aiming)
-		{
-			float Dist = FVector::Dist(MyCharacter->GetActorLocation(), SkillEndTarget->GetActorLocation());
-			if (Dist <= MyCharacter->GetBattlePerceptionRange())
-			{
-				FacingComp->SetAimTarget(SkillEndTarget);
-			}
-		}
+		SetActionState(EActionState::Idle);
 	}
-	bPreviousSkillActive = (CurrentPhase != ESkillPhase::Idle);
+	bPrevSkillActive = (CurrentPhase != ESkillPhase::Idle);
 
-	// ── 3. Shift奔跑结束后的注视恢复 ──
-	if (CurrentPlayerState == EPlayerState::Battle && bPendingRestoreAiming)
+	// ── 3. 奔跑结束 → 闲置 ──
+	if (CurrentActionState == EActionState::Running &&
+		GetWorld()->GetTimeSeconds() - RunStartTime > 0.3f &&
+		MyCharacter->GetVelocity().SizeSquared() < 100.0f)
 	{
-		AActor* RunTarget = FacingComp->GetAimTarget();
-		if (!RunTarget)
-		{
-			bPendingRestoreAiming = false;
-		}
-		else if (MyCharacter->GetVelocity().IsNearlyZero())
-		{
-			bPendingRestoreAiming = false;
-			float Dist = FVector::Dist(MyCharacter->GetActorLocation(), RunTarget->GetActorLocation());
-			if (Dist <= MyCharacter->GetBattlePerceptionRange())
-			{
-				if (FacingComp->GetCurrentFacingMode() != EFacingMode::Aiming)
-				{
-					FacingComp->SetAimTarget(RunTarget);
-				}
-			}
-		}
+		SetActionState(EActionState::Idle);
+	}
+
+	// ── 4. 闲置时恢复注视模式 ──
+	if (CurrentActionState == EActionState::Idle &&
+		CurrentCombatState == ECombatState::BattlePerception &&
+		FacingComp->GetAimTarget() &&
+		FacingComp->GetCurrentFacingMode() != EFacingMode::Aiming)
+	{
+		FacingComp->SetMode(EFacingMode::Aiming);
 	}
 
 	// ── 4. 自动攻击 ──
@@ -110,30 +94,37 @@ void AWorldPlayerController::Tick(float DeltaTime)
 	if (Dist <= PendingMaxRange + 80.0f)
 	{
 		bPendingAttack = false;
+		SetActionState(EActionState::Skill);
 		SkillSys->ActivateLeft();
 	}
 }
 
-void AWorldPlayerController::SetPlayerState(EPlayerState NewState)
+void AWorldPlayerController::SetCombatState(ECombatState NewState)
 {
-	if (CurrentPlayerState == NewState) return;
+	if (CurrentCombatState == NewState) return;
 
-	APlayerCharacter* MyCharacter = Cast<APlayerCharacter>(GetPawn());
-	EPlayerState OldState = CurrentPlayerState;
-	CurrentPlayerState = NewState;
+	CurrentCombatState = NewState;
+	OnCombatStateChanged.Broadcast(NewState);
 
-	if (NewState == EPlayerState::Default)
+	if (NewState == ECombatState::Default)
 	{
 		bPendingAttack = false;
-		bPendingRestoreAiming = false;
-		if (MyCharacter)
+		if (APlayerCharacter* MyChar = Cast<APlayerCharacter>(GetPawn()))
 		{
-			if (UFacingComponent* FacingComp = MyCharacter->GetFacingComponent())
+			if (UFacingComponent* FacingComp = MyChar->GetFacingComponent())
 			{
 				FacingComp->ClearAimTarget();
 			}
 		}
 	}
+}
+
+void AWorldPlayerController::SetActionState(EActionState NewState)
+{
+	if (CurrentActionState == NewState) return;
+
+	CurrentActionState = NewState;
+	OnActionStateChanged.Broadcast(NewState);
 }
 
 void AWorldPlayerController::BeginPlay()
@@ -179,7 +170,7 @@ void AWorldPlayerController::OnLeftMouseClick()
 	if (ClickedEnemy)
 	{
 		FacingComp->SetAimTarget(ClickedEnemy);
-		SetPlayerState(EPlayerState::Battle);
+		SetCombatState(ECombatState::BattlePerception);
 		LastClickTarget = ClickedEnemy->GetActorLocation();
 
 		MoveComp->MaxWalkSpeed = bShiftDown ? MyCharacter->GetRunSpeed() : MyCharacter->GetWalkSpeed();
@@ -191,37 +182,38 @@ void AWorldPlayerController::OnLeftMouseClick()
 		{
 			bPendingAttack = true;
 			PendingMaxRange = MaxRange;
+			SetActionState(EActionState::Walking);
 			MyCharacter->MoveToLocation(ClickedEnemy->GetActorLocation());
 			return;
 		}
 
 		bPendingAttack = false;
 		SkillSys->ActivateLeft();
+		SetActionState(EActionState::Skill);
 		return;
 	}
 
 	// ── 点击地面 → 移动 ──
 	if (ClickResult.bHitSuccess)
 	{
-		if (CurrentPlayerState == EPlayerState::Battle)
+		EActionState NewAction = EActionState::Walking;
+		if (bShiftDown)
 		{
-			if (bShiftDown)
+			NewAction = EActionState::Running;
+			if (FacingComp->GetCurrentFacingMode() == EFacingMode::Aiming)
 			{
-				MoveComp->bOrientRotationToMovement = true;
-				MoveComp->MaxWalkSpeed = MyCharacter->GetRunSpeed();
-				bPendingRestoreAiming = true;
+				FacingComp->SetMode(EFacingMode::Walking);
 			}
-			else
+			RunStartTime = GetWorld()->GetTimeSeconds();
+		}
+		else if (CurrentCombatState == ECombatState::BattlePerception)
+		{
+			if (FacingComp->GetAimTarget() && FacingComp->GetCurrentFacingMode() != EFacingMode::Aiming)
 			{
-				MoveComp->MaxWalkSpeed = MyCharacter->GetWalkSpeed();
+				FacingComp->SetMode(EFacingMode::Aiming);
 			}
 		}
-		else
-		{
-			MoveComp->bOrientRotationToMovement = true;
-			MoveComp->MaxWalkSpeed = bShiftDown ? MyCharacter->GetRunSpeed() : MyCharacter->GetWalkSpeed();
-		}
-
+		SetActionState(NewAction);
 		MyCharacter->MoveToLocation(ClickResult.HitLocation);
 	}
 }
@@ -243,7 +235,6 @@ void AWorldPlayerController::OnRightMouseClick()
 		LastClickTarget = ClickResult.HitLocation;
 	}
 
-	// ── 点击敌人 → 进入战斗状态，立即释放右键技能 ──
 	AEnemyCharacter* ClickedEnemy = Cast<AEnemyCharacter>(ClickResult.HitActor.Get());
 	if (ClickedEnemy)
 	{
@@ -251,11 +242,11 @@ void AWorldPlayerController::OnRightMouseClick()
 		{
 			FacingComp->SetAimTarget(ClickedEnemy);
 		}
-		SetPlayerState(EPlayerState::Battle);
+		SetCombatState(ECombatState::BattlePerception);
 		LastClickTarget = ClickedEnemy->GetActorLocation();
 	}
 
-	// 释放右键技能（不检查距离，直接释放）
+	SetActionState(EActionState::Skill);
 	SkillSys->ActivateRight();
 }
 

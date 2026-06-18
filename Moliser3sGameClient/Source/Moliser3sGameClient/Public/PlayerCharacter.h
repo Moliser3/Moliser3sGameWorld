@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "BaseCharacter.h"
+#include "GamePlayerState.h"
 #include "PlayerCharacter.generated.h"
 
 class UFacingComponent;
@@ -25,11 +26,16 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Components")
 	UCameraComponent* GetCamera() const { return CameraComponent; }
 
+	UFUNCTION()
+	void OnCombatStateChanged(ECombatState NewCombat);
+
+	UFUNCTION()
+	void OnActionStateChanged(EActionState NewAction);
+
 protected:
 	virtual void BeginPlay() override;
 
-	UFUNCTION()
-	void UpdateMovementSpeed(EFacingMode NewMode);
+	void ApplyFacingForState();
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UFacingComponent> FacingComponent;

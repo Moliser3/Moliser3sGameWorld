@@ -48,13 +48,14 @@ void USkillSystemComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 
 		if (Elapsed >= CachedLinkDuration)
 		{
-			DEBUG_SKILL("[技能] 衔接超时, 重置索引");
-			LeftGroupIndex = 0;
+				LeftGroupIndex = 0;
 			RightGroupIndex = 0;
 			LeftLastSkillType = ESkillType::None;
 			LeftStageForType = 0;
+			bLeftFirstActivation = true;
 			RightLastSkillType = ESkillType::None;
 			RightStageForType = 0;
+			bRightFirstActivation = true;
 			SkillPhase = ESkillPhase::Idle;
 		}
 	}
@@ -62,17 +63,18 @@ void USkillSystemComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 
 void USkillSystemComponent::ActivateLeft()
 {
-	ExecuteSkillFromGroup(LeftSkillGroup, LeftGroupIndex, LeftLastSkillType, LeftStageForType);
+	ExecuteSkillFromGroup(LeftSkillGroup, LeftGroupIndex, LeftLastSkillType, LeftStageForType, bLeftFirstActivation);
 }
 
 void USkillSystemComponent::ActivateRight()
 {
-	ExecuteSkillFromGroup(RightSkillGroup, RightGroupIndex, RightLastSkillType, RightStageForType);
+	ExecuteSkillFromGroup(RightSkillGroup, RightGroupIndex, RightLastSkillType, RightStageForType, bRightFirstActivation);
 }
 
 void USkillSystemComponent::ExecuteSkillFromGroup(
 	TArray<TObjectPtr<USkillBase>>& Group, int32& Index,
-	ESkillType& LastType, int32& StageForType)
+	ESkillType& LastType, int32& StageForType,
+	bool& bFirstActivation)
 {
 	float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
 
@@ -89,8 +91,7 @@ void USkillSystemComponent::ExecuteSkillFromGroup(
 	case ESkillPhase::Recovery:
 		if (CurrentSkill)
 		{
-			DEBUG_SKILL("[技能] 打断: %s 阶段%d", *CurrentSkill->SkillName.ToString(), CurrentSkill->GetCurrentStage());
-			CurrentSkill->OnInterrupt(GetOwner());
+				CurrentSkill->OnInterrupt(GetOwner());
 			CurrentSkill = nullptr;
 		}
 		SkillPhase = ESkillPhase::Idle;
@@ -113,11 +114,20 @@ void USkillSystemComponent::ExecuteSkillFromGroup(
 		return;
 	}
 
-	if (Skill->SkillType == LastType)
+	if (bFirstActivation)
+	{
+		bFirstActivation = false;
+		StageForType = 0;
+	}
+	else if (Skill->SkillType == LastType)
 	{
 		StageForType++;
 	}
 	else
+	{
+		StageForType = 0;
+	}
+	if (!Skill->Stages.IsValidIndex(StageForType))
 	{
 		StageForType = 0;
 	}
@@ -128,12 +138,9 @@ void USkillSystemComponent::ExecuteSkillFromGroup(
 	SkillPhase = ESkillPhase::Windup;
 	PhaseStartTime = Now;
 
-	DEBUG_SKILL("[技能] 释放: %s 阶段%d (组%d)", *Skill->SkillName.ToString(), StageForType, Index);
-
 	Skill->Execute(GetOwner());
 
 	Index = (Index + 1) % Group.Num();
-	DEBUG_SKILL("[技能] 组索引→%d", Index);
 }
 
 float USkillSystemComponent::GetMaxSkillRange() const

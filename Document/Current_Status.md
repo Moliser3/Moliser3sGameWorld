@@ -1,23 +1,33 @@
 # 当前工作状态
 
-> 最后更新：2026/06/15 18:30
+> 最后更新：2026/06/18 15:00
 
 ## 当前阶段
 第一阶段（基础完善）**全部完成** ✅
-第二阶段（技能扩展 / 需求变更）—— 多阶段技能 + 双技能组 + 左键恢复 ✅
+第二阶段（技能扩展 / 需求变更）**全部完成** ✅
+第三阶段（正交状态机重构）—— 双轴状态 + 事件驱动已完成 ✅
+
+## 已完成工作（06/18）
+
+### 三十一、正交状态机重构（双轴状态 + 事件驱动）
+- **新增 `GamePlayerState.h`**：定义 `ECombatState(Default/BattlePerception)` + `EActionState(Idle/Walking/Running/Skill)` 双轴
+- **替换单轴 `EPlayerState`**：从 Controller 移除，拆分为双轴独立管理
+- **事件驱动**：`OnCombatStateChanged` / `OnActionStateChanged` 广播委托
+- **PlayerCharacter 监听回调**：根据(Combat, Action)组合矩阵决定面朝+速度
+- **组合行为矩阵**：
+  | Combat | Action | 面朝 | 速度 |
+  |--------|--------|------|------|
+  | Default | Walking | 移动方向 | 300 |
+  | Default | Running | 移动方向 | 600 |
+  | Battle | Walking | 目标 | 300 |
+  | Battle | Running | 移动方向 | 600 → 到达Idle后恢复目标 |
+  | * | Skill | 点击方向 | 0(停移动) |
+- **FacingComponent 独立**：仅管理 Aiming/Walking 模式切换，不关心来源
+- **清理**：移除 `bPendingRestoreAiming`、`bPreviousSkillActive`、`EPlayerState`
 
 ## 已完成工作（06/15）
 
-### 二十七、玩家行为状态重构（默认状态/战斗状态）
-- **新增 `EPlayerState` 枚举**：`Default(默认状态)` / `Battle(战斗状态)`，在 `WorldPlayerController` 中管理
-- **状态转移**：点击敌人 → Default → Battle；敌人超出战斗感知范围或无目标 → Battle → Default
-- **默认状态**：点击地面行走(300)，Shift+点击奔跑(600)；点击敌人锁定并移向敌人
-- **战斗状态右键敌人**：循环释放技能（复用原有逻辑）
-- **战斗状态右键地面**：默认行走(300)面朝敌人；Shift奔跑(600)面朝移动方向，到达后恢复面朝敌人
-- **位移技能恢复注视**：战斗状态下释放位移技能后，技能结束自动恢复注视模式面朝敌人
-- **Shift键检测**：`IsInputKeyDown(EKeys::LeftShift)`，直接在 C++ 中判断无需蓝图额外绑定
-- **新增 `BattlePerceptionRange`（战斗感知范围）**：`PlayerCharacter` 蓝图可配置，默认 1500
-- **FacingComponent 简化**：移除距离自动清除注视逻辑（由 Controller 统一管理）
+### 二十七、玩家行为状态重构（已废弃 → 被 06/18 三十一替代）
 
 ### 二十八、多阶段技能系统 + 双技能组
 - **新增 `ESkillType` 枚举**：标识技能类型（直拳/勾拳等），用于阶段推进判断

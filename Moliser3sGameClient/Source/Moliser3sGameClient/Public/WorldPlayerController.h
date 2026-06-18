@@ -2,18 +2,12 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
+#include "GamePlayerState.h"
 #include "WorldPlayerController.generated.h"
 
 class UClickDetectionComponent;
 class UInputMappingContext;
 class UCameraControllerComponent;
-
-UENUM(BlueprintType)
-enum class EPlayerState : uint8
-{
-	Default UMETA(DisplayName = "默认状态"),
-	Battle  UMETA(DisplayName = "战斗状态")
-};
 
 UCLASS()
 class MOLISER3SGAMECLIENT_API AWorldPlayerController : public APlayerController
@@ -50,12 +44,22 @@ public:
 	void SetLastClickTarget(const FVector& NewTarget) { LastClickTarget = NewTarget; }
 
 	UFUNCTION(BlueprintPure, Category = "State")
-	EPlayerState GetPlayerState() const { return CurrentPlayerState; }
+	ECombatState GetCombatState() const { return CurrentCombatState; }
+
+	UFUNCTION(BlueprintPure, Category = "State")
+	EActionState GetActionState() const { return CurrentActionState; }
+
+	UPROPERTY(BlueprintAssignable, Category = "State")
+	FOnCombatStateChanged OnCombatStateChanged;
+
+	UPROPERTY(BlueprintAssignable, Category = "State")
+	FOnActionStateChanged OnActionStateChanged;
 
 protected:
 	virtual void BeginPlay() override;
 
-	void SetPlayerState(EPlayerState NewState);
+	void SetCombatState(ECombatState NewState);
+	void SetActionState(EActionState NewState);
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
 	TObjectPtr<UInputMappingContext> DefaultMappingContext;
@@ -69,13 +73,14 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Click")
 	FVector LastClickTarget = FVector::ZeroVector;
 
-	bool bPendingAttack = false;
-	float PendingMaxRange = 0.0f;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State")
+	ECombatState CurrentCombatState = ECombatState::Default;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State")
-	EPlayerState CurrentPlayerState = EPlayerState::Default;
+	EActionState CurrentActionState = EActionState::Idle;
 
-	bool bPreviousSkillActive = false;
-	bool bPendingRestoreAiming = false;
+	float RunStartTime = 0.0f;
+	bool bPendingAttack = false;
+	float PendingMaxRange = 0.0f;
 	bool bDefending = false;
 };

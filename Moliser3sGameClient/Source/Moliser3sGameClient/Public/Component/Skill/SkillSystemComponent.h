@@ -5,10 +5,6 @@
 #include "Skill/SkillTypes.h"
 #include "SkillSystemComponent.generated.h"
 
-#define DEBUG_SKILL(Format, ...) \
-	UE_LOG(LogTemp, Warning, TEXT(Format), ##__VA_ARGS__); \
-	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Cyan, FString::Printf(TEXT(Format), ##__VA_ARGS__));
-
 class USkillBase;
 
 UENUM(BlueprintType)
@@ -47,7 +43,8 @@ public:
 
 protected:
 	void ExecuteSkillFromGroup(TArray<TObjectPtr<USkillBase>>& Group, int32& Index,
-	                           ESkillType& LastType, int32& StageForType);
+	                           ESkillType& LastType, int32& StageForType,
+	                           bool& bFirstActivation);
 
 	/** 左键技能组 */
 	UPROPERTY(EditDefaultsOnly, Instanced, Category = "LeftSkill")
@@ -75,4 +72,7 @@ protected:
 	int32 RightStageForType = 0;
 
 	float CachedLinkDuration = 0.0f;
+
+	bool bLeftFirstActivation = true;
+	bool bRightFirstActivation = true;
 };
