@@ -5,6 +5,10 @@
 #include "Skill/SkillTypes.h"
 #include "SkillSystemComponent.generated.h"
 
+#define DEBUG_SKILL(Format, ...) \
+	UE_LOG(LogTemp, Warning, TEXT(Format), ##__VA_ARGS__); \
+	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Cyan, FString::Printf(TEXT(Format), ##__VA_ARGS__));
+
 class USkillBase;
 
 UENUM(BlueprintType)

@@ -48,6 +48,7 @@ void USkillSystemComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 
 		if (Elapsed >= CachedLinkDuration)
 		{
+			DEBUG_SKILL("[技能] 衔接超时, 重置索引");
 			LeftGroupIndex = 0;
 			RightGroupIndex = 0;
 			LeftLastSkillType = ESkillType::None;
@@ -88,6 +89,7 @@ void USkillSystemComponent::ExecuteSkillFromGroup(
 	case ESkillPhase::Recovery:
 		if (CurrentSkill)
 		{
+			DEBUG_SKILL("[技能] 打断: %s 阶段%d", *CurrentSkill->SkillName.ToString(), CurrentSkill->GetCurrentStage());
 			CurrentSkill->OnInterrupt(GetOwner());
 			CurrentSkill = nullptr;
 		}
@@ -126,9 +128,12 @@ void USkillSystemComponent::ExecuteSkillFromGroup(
 	SkillPhase = ESkillPhase::Windup;
 	PhaseStartTime = Now;
 
+	DEBUG_SKILL("[技能] 释放: %s 阶段%d (组%d)", *Skill->SkillName.ToString(), StageForType, Index);
+
 	Skill->Execute(GetOwner());
 
 	Index = (Index + 1) % Group.Num();
+	DEBUG_SKILL("[技能] 组索引→%d", Index);
 }
 
 float USkillSystemComponent::GetMaxSkillRange() const
