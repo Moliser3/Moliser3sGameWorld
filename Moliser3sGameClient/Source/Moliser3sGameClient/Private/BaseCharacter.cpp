@@ -5,6 +5,8 @@
 #include "Blueprint/AIBlueprintHelperLibrary.h"
 #include "Component/Attribute/AttributeComponent.h"
 #include "Component/Damage/DamageCalculatorComponent.h"
+#include "Component/Equipment/EquipmentComponent.h"
+#include "DebugHelper.h"
 
 ABaseCharacter::ABaseCharacter()
 {
@@ -18,6 +20,9 @@ ABaseCharacter::ABaseCharacter()
 
 	// 创建伤害计算组件
 	DamageCalculator = CreateDefaultSubobject<UDamageCalculatorComponent>(TEXT("DamageCalculator"));
+
+	// 创建设备管理组件
+	EquipmentComponent = CreateDefaultSubobject<UEquipmentComponent>(TEXT("EquipmentComponent"));
 }
 
 void ABaseCharacter::MoveToLocation(const FVector& DestLocation)
@@ -38,5 +43,32 @@ void ABaseCharacter::StopMovement()
 	if (AController* OwnerController = GetController())
 	{
 		OwnerController->StopMovement();
+	}
+}
+
+void ABaseCharacter::BeginPlay()
+{
+	Super::BeginPlay();
+
+	if (UAttributeComponent* Attr = GetAttributeComponent())
+	{
+		const FCharacterCoreData& Data = Attr->GetCharacterData();
+
+		FString ActorName = GetName();
+
+		UE_LOG(LogTemp, Warning, TEXT("======================================"));
+		UE_LOG(LogTemp, Warning, TEXT("  [%s] Base Attributes"), *ActorName);
+		UE_LOG(LogTemp, Warning, TEXT("======================================"));
+		UE_LOG(LogTemp, Warning, TEXT("  Five: Jin=%d Mu=%d Shui=%d Huo=%d Tu=%d"),
+			Data.Jin, Data.Mu, Data.Shui, Data.Huo, Data.Tu);
+		UE_LOG(LogTemp, Warning, TEXT("  JinLi=%.1f QiXue=%.1f NeiXi=%.1f ShenFa=%.1f TiPo=%.1f"),
+			Data.GetJinLi(), Data.GetQiXue(), Data.GetNeiXi(), Data.GetShenFa(), Data.GetTiPo());
+		UE_LOG(LogTemp, Warning, TEXT("  Atk=%.0f HP=%.0f/%.0f MP=%.0f/%.0f"),
+			Data.GetAttackPower(), Attr->GetHealth(), Data.GetMaxHealth(), Attr->GetMana(), Data.GetMaxMana());
+		UE_LOG(LogTemp, Warning, TEXT("  HP_regen=%.1f/s MP_regen=%.1f/s ExtDef=%.1f IntDef=%.1f"),
+			Data.GetHealthRegen(), Data.GetManaRegen(), Data.GetExternalDefense(), Data.GetInternalDefense());
+		UE_LOG(LogTemp, Warning, TEXT("  Spd=+%.0f%% Dodge=%.1f%% Crit=%.1f%%"),
+			Data.GetSpeedBonusPct(), Data.GetDodgeRatePct(), Data.GetCritRatePct());
+		UE_LOG(LogTemp, Warning, TEXT("======================================"));
 	}
 }

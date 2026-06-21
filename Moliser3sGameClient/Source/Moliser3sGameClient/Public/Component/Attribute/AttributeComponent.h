@@ -1,9 +1,8 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "Data/CharacterData.h"
 #include "AttributeComponent.generated.h"
 
 /** 属性变化时广播的事件 */
@@ -12,111 +11,127 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnManaChangedDelegate, float, OldM
 
 /**
  * 角色属性组件
- * 管理血量、法力、攻击属性、防御属性
+ * 管理五行根基值、运行时血量/法力、战斗属性
  */
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class MOLISER3SGAMECLIENT_API UAttributeComponent : public UActorComponent
 {
-    GENERATED_BODY()
+	GENERATED_BODY()
 
 public:
-    UAttributeComponent();
+	UAttributeComponent();
 
-    // ===== 血量 =====
-    UFUNCTION(BlueprintPure, Category = "Attributes")
-    float GetHealth() const { return Health; }
+	virtual void BeginPlay() override;
 
-    UFUNCTION(BlueprintPure, Category = "Attributes")
-    float GetMaxHealth() const { return MaxHealth; }
+	// ===== 角色核心数据（五行 → 五维 → 派生属性） =====
+	UFUNCTION(BlueprintPure, Category = "Attributes")
+	const FCharacterCoreData& GetCharacterData() const { return CharacterData; }
 
-    UFUNCTION(BlueprintPure, Category = "Attributes")
-    float GetHealthPercent() const { return MaxHealth > 0.0f ? Health / MaxHealth : 0.0f; }
+	UFUNCTION(BlueprintCallable, Category = "Attributes")
+	void SetCharacterData(const FCharacterCoreData& NewData);
 
-    UFUNCTION(BlueprintCallable, Category = "Attributes")
-    void TakeDamage(float DamageAmount, AActor* Instigator = nullptr);
+	// ===== 血量 =====
+	UFUNCTION(BlueprintPure, Category = "Attributes")
+	float GetHealth() const { return Health; }
 
-    UFUNCTION(BlueprintCallable, Category = "Attributes")
-    void Heal(float HealAmount);
+	UFUNCTION(BlueprintPure, Category = "Attributes")
+	float GetMaxHealth() const { return CharacterData.GetMaxHealth(); }
 
-    // ===== 法力 =====
-    UFUNCTION(BlueprintPure, Category = "Attributes")
-    float GetMana() const { return Mana; }
+	UFUNCTION(BlueprintPure, Category = "Attributes")
+	float GetHealthPercent() const { return GetMaxHealth() > 0.0f ? Health / GetMaxHealth() : 0.0f; }
 
-    UFUNCTION(BlueprintPure, Category = "Attributes")
-    float GetMaxMana() const { return MaxMana; }
+	UFUNCTION(BlueprintCallable, Category = "Attributes")
+	void TakeDamage(float DamageAmount, AActor* Instigator = nullptr);
 
-    UFUNCTION(BlueprintPure, Category = "Attributes")
-    float GetManaPercent() const { return MaxMana > 0.0f ? Mana / MaxMana : 0.0f; }
+	UFUNCTION(BlueprintCallable, Category = "Attributes")
+	void Heal(float HealAmount);
 
-    UFUNCTION(BlueprintCallable, Category = "Attributes")
-    void ConsumeMana(float Cost);
+	// ===== 法力 =====
+	UFUNCTION(BlueprintPure, Category = "Attributes")
+	float GetMana() const { return Mana; }
 
-    UFUNCTION(BlueprintCallable, Category = "Attributes")
-    void RestoreMana(float Amount);
+	UFUNCTION(BlueprintPure, Category = "Attributes")
+	float GetMaxMana() const { return CharacterData.GetMaxMana(); }
 
-    // ===== 攻击属性（属于攻击者） =====
-    UFUNCTION(BlueprintPure, Category = "Combat")
-    float GetBaseDamage() const { return BaseDamage; }
+	UFUNCTION(BlueprintPure, Category = "Attributes")
+	float GetManaPercent() const { return GetMaxMana() > 0.0f ? Mana / GetMaxMana() : 0.0f; }
 
-    UFUNCTION(BlueprintPure, Category = "Combat")
-    float GetCritRate() const { return CritRate; }
+	UFUNCTION(BlueprintCallable, Category = "Attributes")
+	void ConsumeMana(float Cost);
 
-    UFUNCTION(BlueprintPure, Category = "Combat")
-    float GetCritMultiplier() const { return CritMultiplier; }
+	UFUNCTION(BlueprintCallable, Category = "Attributes")
+	void RestoreMana(float Amount);
 
-    // ===== 防御属性（属于受击者） =====
-    UFUNCTION(BlueprintPure, Category = "Combat")
-    float GetArmor() const { return Armor; }
+	// ===== 攻击属性（由五行派生） =====
+	UFUNCTION(BlueprintPure, Category = "Combat")
+	float GetBaseDamage() const { return CharacterData.GetAttackPower(); }
 
-    UFUNCTION(BlueprintPure, Category = "Combat")
-    float GetDamageReduction() const { return DamageReduction; }
+	UFUNCTION(BlueprintPure, Category = "Combat")
+	float GetCritRate() const { return CharacterData.GetCritRatePct() / 100.0f; }
+
+	UFUNCTION(BlueprintPure, Category = "Combat")
+	float GetCritMultiplier() const { return CharacterData.CritMultiplier; }
+
+	// ===== 防御属性（由五行派生） =====
+	UFUNCTION(BlueprintPure, Category = "Combat")
+	float GetExternalDefense() const { return CharacterData.GetExternalDefense(); }
+
+	UFUNCTION(BlueprintPure, Category = "Combat")
+	float GetInternalDefense() const { return CharacterData.GetInternalDefense(); }
+
+	UFUNCTION(BlueprintPure, Category = "Combat")
+	float GetDamageReduction() const { return CharacterData.DamageReduction; }
+
+	// ===== 五行派生便捷接口 =====
+	UFUNCTION(BlueprintPure, Category = "WuXing")
+	float GetAttackPower() const { return CharacterData.GetAttackPower(); }
+
+	UFUNCTION(BlueprintPure, Category = "WuXing")
+	float GetHealthRegen() const { return CharacterData.GetHealthRegen(); }
+
+	UFUNCTION(BlueprintPure, Category = "WuXing")
+	float GetManaRegen() const { return CharacterData.GetManaRegen(); }
+
+	UFUNCTION(BlueprintPure, Category = "WuXing")
+	float GetSpeedBonusPct() const { return CharacterData.GetSpeedBonusPct(); }
+
+	UFUNCTION(BlueprintPure, Category = "WuXing")
+	float GetDodgeRatePct() const { return CharacterData.GetDodgeRatePct(); }
+
+	/** 恢复满血量 */
+	UFUNCTION(BlueprintCallable, Category = "Attributes")
+	void RestoreFullHealth();
+
+	/** 恢复满法力 */
+	UFUNCTION(BlueprintCallable, Category = "Attributes")
+	void RestoreFullMana();
+
+	/** 重新同步运行时血量/法力到上限 */
+	UFUNCTION(BlueprintCallable, Category = "Attributes")
+	void SyncToMaxValues();
 
 public:
-    /** 血量变化事件 */
-    UPROPERTY(BlueprintAssignable, Category = "Attributes")
-    FOnHealthChangedDelegate OnHealthChanged;
+	/** 血量变化事件 */
+	UPROPERTY(BlueprintAssignable, Category = "Attributes")
+	FOnHealthChangedDelegate OnHealthChanged;
 
-    /** 法力变化事件 */
-    UPROPERTY(BlueprintAssignable, Category = "Attributes")
-    FOnManaChangedDelegate OnManaChanged;
+	/** 法力变化事件 */
+	UPROPERTY(BlueprintAssignable, Category = "Attributes")
+	FOnManaChangedDelegate OnManaChanged;
 
 protected:
-    // ===== 核心属性 =====
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attributes")
-    float MaxHealth = 100.0f;
+	// ===== 五行核心数据 =====
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "五行核心数据")
+	FCharacterCoreData CharacterData;
 
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Attributes")
-    float Health = 100.0f;
+	// ===== 运行时状态 =====
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "运行时状态")
+	float Health = 0.0f;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attributes")
-    float MaxMana = 50.0f;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "运行时状态")
+	float Mana = 0.0f;
 
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Attributes")
-    float Mana = 50.0f;
-
-    /** 是否在 BeginPlay 时初始化满状态 */
-    UPROPERTY(EditDefaultsOnly, Category = "Attributes")
-    bool bInitializeFull = true;
-
-    // ===== 攻击属性 =====
-    /** 基础伤害 */
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Attack", meta = (ClampMin = "0.0"))
-    float BaseDamage = 50.0f;
-
-    /** 暴击率（0~1） */
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Attack", meta = (ClampMin = "0.0", ClampMax = "1.0"))
-    float CritRate = 0.3f;
-
-    /** 暴击倍率 */
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Attack", meta = (ClampMin = "1.0"))
-    float CritMultiplier = 2.0f;
-
-    // ===== 防御属性 =====
-    /** 护甲（固定减伤） */
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Defense", meta = (ClampMin = "0.0"))
-    float Armor = 20.0f;
-
-    /** 伤害减免%（0~1） */
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Defense", meta = (ClampMin = "0.0", ClampMax = "1.0"))
-    float DamageReduction = 0.1f;
+	/** 是否在 BeginPlay 时初始化满状态 */
+	UPROPERTY(EditDefaultsOnly, Category = "Attributes")
+	bool bInitializeFull = true;
 };

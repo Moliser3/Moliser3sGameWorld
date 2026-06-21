@@ -6,6 +6,7 @@
 
 class UAttributeComponent;
 class UDamageCalculatorComponent;
+class UEquipmentComponent;
 
 UCLASS(Blueprintable)
 class MOLISER3SGAMECLIENT_API ABaseCharacter : public ACharacter
@@ -14,6 +15,8 @@ class MOLISER3SGAMECLIENT_API ABaseCharacter : public ACharacter
 
 public:
 	ABaseCharacter();
+
+	virtual void BeginPlay() override;
 
 	UFUNCTION(BlueprintCallable, Category = "Movement")
 	void MoveToLocation(const FVector& DestLocation);
@@ -30,6 +33,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Components")
 	UDamageCalculatorComponent* GetDamageCalculator() const { return DamageCalculator; }
 
+	UFUNCTION(BlueprintPure, Category = "Components")
+	UEquipmentComponent* GetEquipmentComponent() const { return EquipmentComponent; }
+
 	UFUNCTION(BlueprintPure, Category = "Movement")
 	float GetWalkSpeed() const { return WalkSpeed; }
 
@@ -42,6 +48,9 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UDamageCalculatorComponent> DamageCalculator;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UEquipmentComponent> EquipmentComponent;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Custom", meta = (ClampMin = "0.0"))
 	float WalkSpeed = 300.0f;
