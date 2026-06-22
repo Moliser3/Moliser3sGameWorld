@@ -1,12 +1,64 @@
 # 当前工作状态
 
-> 最后更新：2026/06/21 22:32
+> 最后更新：2026/06/22 17:54
 
 ## 当前阶段
 第一阶段（基础完善）**全部完成** ✅
 第二阶段（技能扩展 / 需求变更）**全部完成** ✅
 第三阶段（正交状态机重构）—— 双轴状态 + 事件驱动已完成 ✅
-**第四阶段（数据先行 — P2）进行中 🚧**
+**第四阶段（数据先行 — P2）基本完成** ✅  
+**第五阶段（背包系统 — P3）搭建中 🚧**
+
+## 已完成工作（06/22）
+
+### 三十九、Debug 装备测试（13槽位直接赋值）
+- **`BaseCharacter.h`**：新增 13 个 `UPROPERTY(Instanced)` 装备槽属性（头盔~副手），蓝图中直接创建 `UEquipItem` 实例
+- **`BaseCharacter.cpp`**：`BeginPlay` 中自动调用 `EquipmentComponent->EquipItem()`
+- **标记删除**：所有 Debug 代码以 `【Debug 装备测试 — 上线前需删除】` 标记
+
+### 四十、伤害日志中文化 + 装备加成显示
+- **`MeleeSlashSkill.cpp`**：所有 UE_LOG 和屏幕 Debug 信息改为中文
+- **增加输出**：攻击方/防御方的装备五行加成（`装备加成[金+%d 木+%d ...]`）
+
+### 四十一、防御系统改为百分比减免
+- **`DamageCalculatorComponent.cpp`**：防御从固定减法改为 `Defense / (Defense + 100)` 百分比减免
+- 公式：`减免率 = 防御值 / (防御值 + 100)`
+- 解决外伤占比不同但总伤害相同的问题
+- **日志相应更新**：显示外防/内防的数值、减免百分比、减免量
+
+### 四十二、UItemBase 扩展 + 消耗品体系
+- **`ItemBase.h`**：新增 `WorldMesh`（地面静态网格体）、`Use()` 虚函数、`GetIcon()`/`GetWorldMesh()` 缓存加载方法
+- **新增 `Data/ConsumableItem.h/.cpp`**：`UConsumableItem`，含 `EConsumableEffectType`（HealHP/RestoreMP/Buff）
+- `Use()` 实现：根据 EffectType 调用 `AttributeComponent->Heal()` 或 `RestoreMana()`
+
+### 四十三、背包系统（InventoryComponent）
+- **新增 `Component/Inventory/InventoryComponent.h/.cpp`**：
+  - `TArray<UItemBase*> Items`，默认 30 格
+  - `AddItem(自动堆叠)` / `RemoveItem` / `DropItem(丢在地上)` / `UseItem`
+  - `OnInventoryChanged` 事件广播（UMG UI 刷新用）
+- **挂在 `ABaseCharacter`** 上，所有角色自带背包
+
+### 四十四、快捷栏系统（QuickSlotComponent）
+- **新增 `Component/Inventory/QuickSlotComponent.h/.cpp`**：
+  - 8 格快捷栏，`AssignSlot` / `ClearSlot` / `UseSlot`
+  - `OnQuickSlotChanged` 事件广播
+- **挂在 `APlayerCharacter`** 上，仅玩家拥有
+- 数字键 1-8 在蓝图中绑定 `UseSlot()`
+
+### 四十五、地面物品 Actor
+- **新增 `WorldActors/WorldItemActor.h/.cpp`**：
+  - `UStaticMeshComponent`（显示 WorldMesh）
+  - `UWidgetComponent`（显示 Icon，预留）
+  - `OnPickup()` → 调用拾取者的 `InventoryComponent->AddItem()` 后销毁
+  - `InitializeFromItem()` 从物品数据设置可视表现
+
+### 四十六、装备组件清理
+- **删除**消耗品槽位（`EConsumableSlot` / `EquipConsumable` / `AutoConsume`）—— 设计简化，NPC 直接扫描背包使用消耗品
+- **`EConsumableEffectType`** 从 `EquipmentData.h` 移至 `ConsumableItem.h`
+
+### 四十七、Debug 背包测试
+- **`BaseCharacter.h`**：新增 `TestInventoryItems` 数组，蓝图中直接赋值，`BeginPlay` 自动入背包
+- **标记删除**：以 `【Debug 背包测试 — 上线前需删除】` 标记
 
 ## 已完成工作（06/21）
 

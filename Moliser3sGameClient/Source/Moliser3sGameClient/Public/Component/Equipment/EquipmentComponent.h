@@ -8,10 +8,6 @@
 class UEquipItem;
 class UAttributeComponent;
 
-/**
- * 装备管理组件
- * 管理14个槽位的装备/卸下，处理双手武器槽位锁定，应用五行加成
- */
 UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class MOLISER3SGAMECLIENT_API UEquipmentComponent : public UActorComponent
 {
@@ -20,51 +16,38 @@ class MOLISER3SGAMECLIENT_API UEquipmentComponent : public UActorComponent
 public:
 	UEquipmentComponent();
 
-	/** 装备物品到对应槽位 */
-	UFUNCTION(BlueprintCallable, Category = "Equipment")
+	UFUNCTION(BlueprintCallable, Category = "装备")
 	bool EquipItem(UEquipItem* Item);
 
-	/** 从指定槽位卸下物品 */
-	UFUNCTION(BlueprintCallable, Category = "Equipment")
+	UFUNCTION(BlueprintCallable, Category = "装备")
 	bool UnequipItem(EEquipmentSlot Slot);
 
-	/** 获取指定槽位的装备 */
-	UFUNCTION(BlueprintPure, Category = "Equipment")
+	UFUNCTION(BlueprintPure, Category = "装备")
 	UEquipItem* GetEquippedItem(EEquipmentSlot Slot) const;
 
-	/** 获取所有已装备物品 */
-	UFUNCTION(BlueprintPure, Category = "Equipment")
+	UFUNCTION(BlueprintPure, Category = "装备")
 	TArray<UEquipItem*> GetAllEquippedItems() const;
 
-	/** 槽位是否被锁定（双手武器锁定副手） */
-	UFUNCTION(BlueprintPure, Category = "Equipment")
+	UFUNCTION(BlueprintPure, Category = "装备")
 	bool IsSlotLocked(EEquipmentSlot Slot) const;
 
-	/** 获取所有空槽位 */
-	UFUNCTION(BlueprintPure, Category = "Equipment")
+	UFUNCTION(BlueprintPure, Category = "装备")
 	TArray<EEquipmentSlot> GetEmptySlots() const;
 
-	/** 获取所有已占用槽位 */
-	UFUNCTION(BlueprintPure, Category = "Equipment")
+	UFUNCTION(BlueprintPure, Category = "装备")
 	TArray<EEquipmentSlot> GetOccupiedSlots() const;
 
-	/** 计算所有装备的五行加成总和 */
-	UFUNCTION(BlueprintPure, Category = "Equipment")
+	UFUNCTION(BlueprintPure, Category = "装备")
 	void GetTotalWuXingBonuses(int32& OutJin, int32& OutMu, int32& OutShui, int32& OutHuo, int32& OutTu) const;
 
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Equipment")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "装备")
 	TMap<EEquipmentSlot, TObjectPtr<UEquipItem>> EquippedItems;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Equipment")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "装备")
 	TSet<EEquipmentSlot> LockedSlots;
 
-	/** 向 AttributeComponent 应用物品五行加成 */
 	void ApplyItemBonuses(UEquipItem* Item);
-
-	/** 从 AttributeComponent 移除物品五行加成 */
 	void RemoveItemBonuses(UEquipItem* Item);
-
-	/** 获取所属角色的 AttributeComponent */
 	UAttributeComponent* GetAttributeComp() const;
 };

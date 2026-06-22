@@ -6,6 +6,8 @@
 #include "Component/Attribute/AttributeComponent.h"
 #include "Component/Damage/DamageCalculatorComponent.h"
 #include "Component/Equipment/EquipmentComponent.h"
+#include "Component/Inventory/InventoryComponent.h"
+#include "Data/EquipItem.h"
 #include "DebugHelper.h"
 
 ABaseCharacter::ABaseCharacter()
@@ -23,6 +25,9 @@ ABaseCharacter::ABaseCharacter()
 
 	// 创建设备管理组件
 	EquipmentComponent = CreateDefaultSubobject<UEquipmentComponent>(TEXT("EquipmentComponent"));
+
+	// 创建背包组件
+	InventoryComponent = CreateDefaultSubobject<UInventoryComponent>(TEXT("InventoryComponent"));
 }
 
 void ABaseCharacter::MoveToLocation(const FVector& DestLocation)
@@ -70,5 +75,42 @@ void ABaseCharacter::BeginPlay()
 		UE_LOG(LogTemp, Warning, TEXT("  Spd=+%.0f%% Dodge=%.1f%% Crit=%.1f%%"),
 			Data.GetSpeedBonusPct(), Data.GetDodgeRatePct(), Data.GetCritRatePct());
 		UE_LOG(LogTemp, Warning, TEXT("======================================"));
+	}
+
+	// ============================================================
+	// 【Debug 装备测试 — 上线前需删除】
+	// ============================================================
+	auto TryEquip = [&](UEquipItem* Item, EEquipmentSlot Slot)
+	{
+		if (Item)
+		{
+			Item->Slot = Slot;
+			GetEquipmentComponent()->EquipItem(Item);
+		}
+	};
+
+	TryEquip(HelmetItem,    EEquipmentSlot::Helmet);
+	TryEquip(ShouldersItem, EEquipmentSlot::Shoulders);
+	TryEquip(ChestItem,     EEquipmentSlot::Chest);
+	TryEquip(BracersItem,   EEquipmentSlot::Bracers);
+	TryEquip(GlovesItem,    EEquipmentSlot::Gloves);
+	TryEquip(BeltItem,      EEquipmentSlot::Belt);
+	TryEquip(PantsItem,     EEquipmentSlot::Pants);
+	TryEquip(BootsItem,     EEquipmentSlot::Boots);
+	TryEquip(AmuletItem,    EEquipmentSlot::Amulet);
+	TryEquip(Ring1Item,     EEquipmentSlot::Ring1);
+	TryEquip(Ring2Item,     EEquipmentSlot::Ring2);
+	TryEquip(MainHandItem,  EEquipmentSlot::MainHand);
+	TryEquip(OffHandItem,   EEquipmentSlot::OffHand);
+
+	// ============================================================
+	// 【Debug 背包测试 — 上线前需删除】
+	// ============================================================
+	for (UItemBase* Item : TestInventoryItems)
+	{
+		if (Item)
+		{
+			InventoryComponent->AddItem(Item);
+		}
 	}
 }

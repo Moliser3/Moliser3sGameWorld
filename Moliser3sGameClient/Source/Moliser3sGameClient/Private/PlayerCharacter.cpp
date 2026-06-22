@@ -3,6 +3,7 @@
 #include "Camera/CameraComponent.h"
 #include "Component/Facing/FacingComponent.h"
 #include "Component/Skill/SkillSystemComponent.h"
+#include "Component/Inventory/QuickSlotComponent.h"
 #include "WorldPlayerController.h"
 
 APlayerCharacter::APlayerCharacter()
@@ -11,6 +12,7 @@ APlayerCharacter::APlayerCharacter()
 
 	FacingComponent = CreateDefaultSubobject<UFacingComponent>(TEXT("FacingComponent"));
 	SkillSystemComponent = CreateDefaultSubobject<USkillSystemComponent>(TEXT("SkillSystemComponent"));
+	QuickSlotComponent = CreateDefaultSubobject<UQuickSlotComponent>(TEXT("QuickSlotComponent"));
 	CameraComponent = CreateDefaultSubobject<UCameraComponent>(TEXT("CameraComponent"));
 
 	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())

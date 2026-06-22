@@ -2,7 +2,7 @@
 
 > 引擎：Unreal Engine 5.7  
 > 语言：C++  
-> 最后更新：2026/06/18
+> 最后更新：2026/06/22
 
 ---
 
@@ -22,8 +22,12 @@ Moliser3sGameClient/Source/
 ├── Component/
 │   ├── Attribute/AttributeComponent.h/.cpp  # 属性组件
 │   ├── Damage/DamageCalculatorComponent.h/.cpp # 伤害计算
+│   ├── Equipment/EquipmentComponent.h/.cpp  # 装备管理（14槽位+五行加成）
 │   ├── Facing/FacingComponent.h/.cpp        # 朝向控制组件
 │   ├── Input/ClickDetectionComponent.h/.cpp # 点击检测组件
+│   ├── Inventory/
+│   │   ├── InventoryComponent.h/.cpp        # 背包组件（30格+堆叠+事件）
+│   │   └── QuickSlotComponent.h/.cpp        # 快捷栏组件（8格+数字键）
 │   ├── Camera/CameraControllerComponent.h/.cpp # 摄像机控制
 │   └── Skill/SkillSystemComponent.h/.cpp     # 技能系统组件
 ├── Skill/
@@ -32,8 +36,15 @@ Moliser3sGameClient/Source/
 │   ├── DamageSkillBase.h/.cpp               # 伤害技能中间类
 │   ├── MeleeSlashSkill.h/.cpp               # 扇形斩击技能
 │   └── JumpSkill.h/.cpp                     # 跳跃技能 (抛物线位移)
-└── Public/
-    └── DebugHelper.h                        # Debug 宏
+├── Data/
+│   ├── CharacterData.h                      # 角色核心数据（五行→五维→派生）
+│   ├── DataDefinitions.h                    # 公共枚举（EWuXing/ESkillWuXing）
+│   ├── EquipmentData.h                      # 装备/武器/稀有度枚举
+│   ├── ItemBase.h                           # 物品基类（Use+WorldMesh+Icon缓存）
+│   ├── EquipItem.h/.cpp                     # 可装备物品（五行加成）
+│   └── ConsumableItem.h/.cpp                # 消耗品基类（回血/回蓝/增益）
+└── WorldActors/
+    └── WorldItemActor.h/.cpp                # 地面物品 Actor（Mesh+拾取）
 ```
 
 ### 1.2 编译方式
@@ -50,15 +61,19 @@ Build.bat Moliser3sGameClientEditor Win64 Development -Project="项目路径\Mol
 
 | 类名 | 父类 | 作用 | 持有组件 |
 |------|------|------|---------|
-| `ABaseCharacter` | `ACharacter` | 基础角色 | `UAttributeComponent`, `UDamageCalculatorComponent` |
-| `APlayerCharacter` | `ABaseCharacter` | 玩家角色（状态监听者） | `UFacingComponent`, `USkillSystemComponent`, `UCameraComponent` |
-| `AEnemyCharacter` | `ABaseCharacter` | 敌人角色 | （暂无） |
+| `ABaseCharacter` | `ACharacter` | 基础角色 | `UAttributeComponent`, `UDamageCalculatorComponent`, `UEquipmentComponent`, `UInventoryComponent` |
+| `APlayerCharacter` | `ABaseCharacter` | 玩家角色（状态监听者） | `UFacingComponent`, `USkillSystemComponent`, `UQuickSlotComponent`, `UCameraComponent` |
+| `AEnemyCharacter` | `ABaseCharacter` | 敌人角色 | 继承自 ABaseCharacter 的全部组件 |
 
 **ABaseCharacter 关键成员：**
 - `MoveToLocation(FVector)` — NavMesh 寻路移动
 - `StopMovement()` — 停止移动
 - `GetSpeed()` — 当前移动速度
 - `WalkSpeed=300`, `RunSpeed=600`
+- `GetAttributeComponent()` — 属性组件
+- `GetDamageCalculator()` — 伤害计算组件
+- `GetEquipmentComponent()` — 装备组件
+- `GetInventory()` — 背包组件
 
 ### 2.2 控制器
 
@@ -84,7 +99,10 @@ Build.bat Moliser3sGameClientEditor Win64 Development -Project="项目路径\Mol
 | 组件 | 挂载位置 | 作用 |
 |------|---------|------|
 | `UAttributeComponent` | 角色 | 血量/法力/攻击/防御属性 |
-| `UDamageCalculatorComponent` | 角色 | 最终伤害计算（含暴击、护甲） |
+| `UDamageCalculatorComponent` | 角色 | 最终伤害计算（含暴击、防御减免） |
+| `UEquipmentComponent` | 角色 | 装备管理（14槽位+双手武器锁定+五行加成应用） |
+| `UInventoryComponent` | 角色 | 背包（30格+堆叠+拾取/丢弃/使用+事件广播） |
+| `UQuickSlotComponent` | 玩家 | 快捷栏（8格+数字键触发） |
 | `UFacingComponent` | 玩家 | Walking/Aiming 两种朝向模式 |
 | `UClickDetectionComponent` | Controller | 屏幕鼠标射线检测 |
 | `USkillSystemComponent` | 玩家 | 双技能组管理 + 四阶段状态机 |
@@ -451,6 +469,14 @@ Tick (每帧):
 
 | 日期 | 修改内容 | 涉及文件 |
 |------|---------|---------|
+| 06/22 | **[新增] 背包系统**：InventoryComponent(30格) + QuickSlotComponent(8格) | Component/Inventory/* |
+| 06/22 | **[新增] UConsumableItem 消耗品基类** | Data/ConsumableItem.h/.cpp |
+| 06/22 | **[新增] AWorldItemActor 地面物品**：Mesh+Widget+拾取 | WorldActors/WorldItemActor.h/.cpp |
+| 06/22 | **[扩展] UItemBase**：添加 Use() + WorldMesh + GetIcon/GetWorldMesh | Data/ItemBase.h |
+| 06/22 | **[重构] 防御百分比化**：固定减法 → 防/(防+100) | DamageCalculatorComponent.cpp |
+| 06/22 | **[清理] 装备系统**：删除消耗品槽位设计 | EquipmentComponent.h/.cpp, EquipmentData.h |
+| 06/22 | **[新增] Debug 装备/背包测试**：13槽位+背包数组直接配 | BaseCharacter.h/.cpp |
+| 06/22 | **[优化] 伤害日志中文化**：全中文+装备加成显示 | MeleeSlashSkill.cpp |
 | 06/18 | **[重构] 正交状态机**：ECombatState + EActionState 双轴驱动 | GamePlayerState.h, WorldPlayerController.h/.cpp, PlayerCharacter.h/.cpp |
 | 06/18 | **[新增] FacingComponent::SetMode()**：仅切换朝向不丢目标 | FacingComponent.h/.cpp |
 | 06/18 | **[清理] 移除** PendingEnemyTarget / PendingAimTarget / EPlayerState 等旧变量 | WorldPlayerController.h/.cpp, PlayerCharacter.h/.cpp |

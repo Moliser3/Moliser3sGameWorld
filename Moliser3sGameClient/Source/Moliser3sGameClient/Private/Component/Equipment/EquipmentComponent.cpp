@@ -10,49 +10,32 @@ UEquipmentComponent::UEquipmentComponent()
 
 bool UEquipmentComponent::EquipItem(UEquipItem* Item)
 {
-	if (!Item)
-	{
-		return false;
-	}
+	if (!Item) return false;
 
 	EEquipmentSlot TargetSlot = Item->Slot;
 
-	// 检查槽位是否被锁定
 	if (LockedSlots.Contains(TargetSlot))
-	{
 		return false;
-	}
 
-	// 如果是副手物品，检查主手是否装备了双手武器
 	if (Item->bIsOffHand())
 	{
 		if (TObjectPtr<UEquipItem>* MainWeapon = EquippedItems.Find(EEquipmentSlot::MainHand))
 		{
 			if (*MainWeapon && (*MainWeapon)->bIsTwoHanded())
-			{
 				return false;
-			}
 		}
 	}
 
-	// 如果该槽位已装备，先卸下
 	if (EquippedItems.Contains(TargetSlot))
-	{
 		UnequipItem(TargetSlot);
-	}
 
-	// 如果是双手武器，锁定副手槽
 	if (Item->bIsTwoHanded())
 	{
-		// 副手有物品则先卸下
 		if (EquippedItems.Contains(EEquipmentSlot::OffHand))
-		{
 			UnequipItem(EEquipmentSlot::OffHand);
-		}
 		LockedSlots.Add(EEquipmentSlot::OffHand);
 	}
 
-	// 装备物品
 	EquippedItems.Add(TargetSlot, Item);
 	ApplyItemBonuses(Item);
 
@@ -62,25 +45,15 @@ bool UEquipmentComponent::EquipItem(UEquipItem* Item)
 bool UEquipmentComponent::UnequipItem(EEquipmentSlot Slot)
 {
 	TObjectPtr<UEquipItem>* ItemPtr = EquippedItems.Find(Slot);
-	if (!ItemPtr || !*ItemPtr)
-	{
-		return false;
-	}
+	if (!ItemPtr || !*ItemPtr) return false;
 
 	UEquipItem* Item = *ItemPtr;
 
-	// 如果是双手武器，解锁副手槽
 	if (Item->bIsTwoHanded())
-	{
 		LockedSlots.Remove(EEquipmentSlot::OffHand);
-	}
 
-	// 移除加成
 	RemoveItemBonuses(Item);
-
-	// 清空槽位
 	EquippedItems.Remove(Slot);
-
 	return true;
 }
 
@@ -96,9 +69,7 @@ TArray<UEquipItem*> UEquipmentComponent::GetAllEquippedItems() const
 	for (const auto& Pair : EquippedItems)
 	{
 		if (Pair.Value)
-		{
 			Result.Add(Pair.Value.Get());
-		}
 	}
 	return Result;
 }
@@ -122,9 +93,7 @@ TArray<EEquipmentSlot> UEquipmentComponent::GetEmptySlots() const
 	for (EEquipmentSlot Slot : AllSlots)
 	{
 		if (!EquippedItems.Contains(Slot) && !LockedSlots.Contains(Slot))
-		{
 			Empty.Add(Slot);
-		}
 	}
 	return Empty;
 }
@@ -133,9 +102,7 @@ TArray<EEquipmentSlot> UEquipmentComponent::GetOccupiedSlots() const
 {
 	TArray<EEquipmentSlot> Occupied;
 	for (const auto& Pair : EquippedItems)
-	{
 		Occupied.Add(Pair.Key);
-	}
 	return Occupied;
 }
 
@@ -158,11 +125,9 @@ void UEquipmentComponent::GetTotalWuXingBonuses(int32& OutJin, int32& OutMu, int
 void UEquipmentComponent::ApplyItemBonuses(UEquipItem* Item)
 {
 	if (!Item) return;
-
 	UAttributeComponent* AttrComp = GetAttributeComp();
 	if (!AttrComp) return;
 
-	// 直接修改 CharacterData 的五行值（加法）
 	FCharacterCoreData Data = AttrComp->GetCharacterData();
 	Data.AddEquipmentBonus(Item->JinBonus, Item->MuBonus, Item->ShuiBonus, Item->HuoBonus, Item->TuBonus);
 	AttrComp->SetCharacterData(Data);
@@ -171,7 +136,6 @@ void UEquipmentComponent::ApplyItemBonuses(UEquipItem* Item)
 void UEquipmentComponent::RemoveItemBonuses(UEquipItem* Item)
 {
 	if (!Item) return;
-
 	UAttributeComponent* AttrComp = GetAttributeComp();
 	if (!AttrComp) return;
 

@@ -8,6 +8,7 @@
 class UFacingComponent;
 class USkillSystemComponent;
 class UCameraComponent;
+class UQuickSlotComponent;
 
 UCLASS(Blueprintable)
 class MOLISER3SGAMECLIENT_API APlayerCharacter : public ABaseCharacter
@@ -22,6 +23,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Components")
 	USkillSystemComponent* GetSkillSystem() const { return SkillSystemComponent; }
+
+	UFUNCTION(BlueprintPure, Category = "Components")
+	UQuickSlotComponent* GetQuickSlot() const { return QuickSlotComponent; }
 
 	UFUNCTION(BlueprintPure, Category = "Components")
 	UCameraComponent* GetCamera() const { return CameraComponent; }
@@ -42,6 +46,9 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<USkillSystemComponent> SkillSystemComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UQuickSlotComponent> QuickSlotComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera")
 	TObjectPtr<UCameraComponent> CameraComponent;

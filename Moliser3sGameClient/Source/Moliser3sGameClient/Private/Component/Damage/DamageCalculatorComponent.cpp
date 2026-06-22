@@ -56,15 +56,20 @@ FDamageResult UDamageCalculatorComponent::CalculateDamage(
 	float RawExternal = AfterWuXing * ExternalDamageRatio;
 	float RawInternal = AfterWuXing * (1.0f - ExternalDamageRatio);
 
-	// Step5：防御减免
+	// Step5：防御减免（百分比）
+	static const float DefenseConstant = 100.0f;
+
 	float ExternalDef = TargetAttribute->GetExternalDefense();
 	float InternalDef = TargetAttribute->GetInternalDefense();
 
-	float ExternalAfterDef = FMath::Max(0.0f, RawExternal - ExternalDef);
-	float InternalAfterDef = FMath::Max(0.0f, RawInternal - InternalDef);
+	float ExternalDefRate = ExternalDef / (ExternalDef + DefenseConstant);
+	float InternalDefRate = InternalDef / (InternalDef + DefenseConstant);
 
-	Result.ExternalDefenseReduced = FMath::Min(RawExternal, ExternalDef);
-	Result.InternalDefenseReduced = FMath::Min(RawInternal, InternalDef);
+	float ExternalAfterDef = RawExternal * (1.0f - ExternalDefRate);
+	float InternalAfterDef = RawInternal * (1.0f - InternalDefRate);
+
+	Result.ExternalDefenseReduced = RawExternal * ExternalDefRate;
+	Result.InternalDefenseReduced = RawInternal * InternalDefRate;
 
 	// Step6：百分比伤害减免
 	float Reduction = TargetAttribute->GetDamageReduction();
