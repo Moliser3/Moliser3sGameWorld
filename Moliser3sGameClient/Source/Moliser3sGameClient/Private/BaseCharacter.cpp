@@ -106,6 +106,7 @@ void ABaseCharacter::BeginPlay()
 	// ============================================================
 	// 【Debug 背包测试 — 上线前需删除】
 	// ============================================================
+	InventoryComponent->BeginBatch();
 	for (UItemBase* Item : TestInventoryItems)
 	{
 		if (Item)
@@ -113,4 +114,5 @@ void ABaseCharacter::BeginPlay()
 			InventoryComponent->AddItem(Item);
 		}
 	}
+	InventoryComponent->EndBatch();
 }

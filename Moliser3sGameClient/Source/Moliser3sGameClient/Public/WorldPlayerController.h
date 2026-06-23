@@ -49,6 +49,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "State")
 	EActionState GetActionState() const { return CurrentActionState; }
 
+	UFUNCTION(BlueprintPure, Category = "UI")
+	bool IsMouseOverUI() const;
+
 	UPROPERTY(BlueprintAssignable, Category = "State")
 	FOnCombatStateChanged OnCombatStateChanged;
 

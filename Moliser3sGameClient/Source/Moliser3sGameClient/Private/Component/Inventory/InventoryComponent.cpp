@@ -9,22 +9,37 @@ UInventoryComponent::UInventoryComponent()
 	PrimaryComponentTick.bCanEverTick = false;
 }
 
+void UInventoryComponent::BroadcastChange()
+{
+	if (!bBatchMode)
+		OnInventoryChanged.Broadcast();
+}
+
+void UInventoryComponent::BeginBatch()
+{
+	bBatchMode = true;
+}
+
+void UInventoryComponent::EndBatch()
+{
+	bBatchMode = false;
+	OnInventoryChanged.Broadcast();
+}
+
 bool UInventoryComponent::AddItem(UItemBase* Item)
 {
 	if (!Item) return false;
 
-	// 尝试堆叠
 	if (Item->MaxStackSize > 1)
 	{
 		int32 StackSlot = FindStackableSlot(Item->ItemID, Item->MaxStackSize);
 		if (StackSlot != INDEX_NONE)
 		{
-			OnInventoryChanged.Broadcast();
+			BroadcastChange();
 			return true;
 		}
 	}
 
-	// 找空位
 	int32 EmptySlot = FindEmptySlot();
 	if (EmptySlot == INDEX_NONE) return false;
 
@@ -33,7 +48,7 @@ bool UInventoryComponent::AddItem(UItemBase* Item)
 	else
 		Items[EmptySlot] = Item;
 
-	OnInventoryChanged.Broadcast();
+	BroadcastChange();
 	return true;
 }
 
@@ -44,7 +59,7 @@ bool UInventoryComponent::RemoveItem(int32 SlotIndex, int32 Count)
 	Items.RemoveAt(SlotIndex);
 	Items.Add(nullptr);
 
-	OnInventoryChanged.Broadcast();
+	BroadcastChange();
 	return true;
 }
 
@@ -82,6 +97,37 @@ void UInventoryComponent::DropItem(int32 SlotIndex, int32 Count)
 	RemoveItem(SlotIndex, Count);
 }
 
+void UInventoryComponent::SwapItems(int32 IndexA, int32 IndexB)
+{
+	UE_LOG(LogTemp, Warning, TEXT("[Swap] 进入 A=%d B=%d Items.Num=%d MaxSlots=%d"),
+		IndexA, IndexB, Items.Num(), MaxSlots);
+
+	if (!Items.IsValidIndex(IndexA))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[Swap] IndexA=%d 无效! Items.Num=%d"), IndexA, Items.Num());
+		return;
+	}
+	if (IndexB >= MaxSlots || IndexA >= MaxSlots)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[Swap] 越界! IndexA=%d IndexB=%d MaxSlots=%d"), IndexA, IndexB, MaxSlots);
+		return;
+	}
+
+	while (Items.Num() <= IndexB)
+		Items.Add(nullptr);
+
+	UE_LOG(LogTemp, Warning, TEXT("[Swap] 执行交换: Items[%d]=%s <-> Items[%d]=%s"),
+		IndexA, Items[IndexA] ? *Items[IndexA]->ItemID.ToString() : TEXT("null"),
+		IndexB, Items[IndexB] ? *Items[IndexB]->ItemID.ToString() : TEXT("null"));
+
+	TObjectPtr<UItemBase> Temp = Items[IndexA];
+	Items[IndexA] = Items[IndexB];
+	Items[IndexB] = Temp;
+
+	BroadcastChange();
+	UE_LOG(LogTemp, Warning, TEXT("[Swap] 完成"));
+}
+
 void UInventoryComponent::UseItem(int32 SlotIndex)
 {
 	if (!Items.IsValidIndex(SlotIndex) || !Items[SlotIndex]) return;
@@ -91,7 +137,7 @@ void UInventoryComponent::UseItem(int32 SlotIndex)
 
 	Items[SlotIndex]->Use(Owner);
 
-	OnInventoryChanged.Broadcast();
+	BroadcastChange();
 }
 
 int32 UInventoryComponent::FindStackableSlot(FName ItemID, int32 MaxStack) const

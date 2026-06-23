@@ -50,10 +50,22 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "背包")
 	void UseItem(int32 SlotIndex);
 
+	UFUNCTION(BlueprintCallable, Category = "背包")
+	void SwapItems(int32 IndexA, int32 IndexB);
+
+	UFUNCTION(BlueprintCallable, Category = "背包")
+	void BeginBatch();
+
+	UFUNCTION(BlueprintCallable, Category = "背包")
+	void EndBatch();
+
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "背包")
 	TArray<TObjectPtr<UItemBase>> Items;
 
+	bool bBatchMode = false;
+
+	void BroadcastChange();
 	int32 FindStackableSlot(FName ItemID, int32 MaxStack) const;
 	int32 FindEmptySlot() const;
 	AWorldItemActor* SpawnWorldItem(const FVector& Location, UItemBase* Item);

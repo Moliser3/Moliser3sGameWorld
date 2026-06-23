@@ -1,6 +1,6 @@
 # 当前工作状态
 
-> 最后更新：2026/06/22 19:30
+> 最后更新：2026/06/23 17:55
 
 ## 当前阶段
 第一阶段（基础完善）**全部完成** ✅
@@ -67,6 +67,26 @@
 - **`GetMaxSkillRange()`** 改为遍历所有技能的所有阶段取最大值
 - **`JumpSkill` 适配**：`Stage0.SkillRange = -1`
 - **修复问题**：第三阶段前摇较长时角色偏移导致 `MaxSkillRange` 不够大而无法命中的 Bug
+
+## 已完成工作（06/23）
+
+### 四十九、UI点击穿透修复（UMG遮挡鼠标射线）
+- **`WorldPlayerController` 新增 `IsMouseOverUI()`**：使用 `FSlateApplication::Get().GetCursorPos()` + `LocateWindowUnderMouse` 检测鼠标下是否有 `SObjectWidget`（UMG内容控件）
+- **DPI兼容**：使用 `GetCursorPos()` 替代 `GetMousePosition()`，解决窗口模式右下角坐标偏移问题
+- **`OnLeftMouseClick` / `OnRightMouseClick`** 开头调用 `IsMouseOverUI()` 提前返回
+- **开启 `Slate` + `SlateCore` 模块依赖**
+- **正确行为**：有内容的UI（背包/按钮/Border）阻挡射线，空Canvas Panel不阻挡
+
+### 五十、背包拖拽交换系统
+- **`InventoryComponent` 新增 `SwapItems(IndexA, IndexB)`**：交换两个格子的物品，自动填充 `nullptr` 到未初始化的空格
+- **`SwapItems` 支持拖到空格**：目标索引超出数组时自动 `Add(nullptr)` 填充
+- **`BeginBatch()` / `EndBatch()`**：批量操作时不触发 `OnInventoryChanged`，`EndBatch()` 时统一触发一次
+- **`BaseCharacter::BeginPlay` 适配**：测试物品导入用 `BeginBatch/EndBatch` 包裹
+- **`BroadcastChange()` 内部辅助方法**：替代直接 `OnInventoryChanged.Broadcast()`，批量模式下静默
+
+### 五十一、拖拽Debug日志（随后清理）
+- 添加 `[Swap]` 调试日志验证交换逻辑正确性（已清理）
+- 添加 `[UI调试]` 日志排查点击穿透问题（已清理）
 
 ## 已完成工作（06/21）
 

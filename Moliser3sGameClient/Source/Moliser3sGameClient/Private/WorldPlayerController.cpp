@@ -10,6 +10,9 @@
 #include "PlayerCharacter.h"
 #include "EnemyCharacter.h"
 #include "Engine/World.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Widgets/SViewport.h"
+#include "Engine/GameViewportClient.h"
 
 AWorldPlayerController::AWorldPlayerController()
 {
@@ -144,8 +147,25 @@ void AWorldPlayerController::BeginPlay()
 	}
 }
 
+bool AWorldPlayerController::IsMouseOverUI() const
+{
+	FWidgetPath WidgetPath = FSlateApplication::Get().LocateWindowUnderMouse(
+		FSlateApplication::Get().GetCursorPos(),
+		FSlateApplication::Get().GetInteractiveTopLevelWindows()
+	);
+
+	for (int32 i = 0; i < WidgetPath.Widgets.Num(); i++)
+	{
+		if (WidgetPath.Widgets[i].Widget->GetType() == FName("SObjectWidget"))
+			return true;
+	}
+	return false;
+}
+
 void AWorldPlayerController::OnLeftMouseClick()
 {
+	if (IsMouseOverUI()) return;
+
 	if (!ClickDetectionComponent) return;
 
 	APlayerCharacter* MyCharacter = Cast<APlayerCharacter>(GetPawn());
@@ -220,6 +240,8 @@ void AWorldPlayerController::OnLeftMouseClick()
 
 void AWorldPlayerController::OnRightMouseClick()
 {
+	if (IsMouseOverUI()) return;
+
 	if (!ClickDetectionComponent) return;
 
 	APlayerCharacter* MyCharacter = Cast<APlayerCharacter>(GetPawn());

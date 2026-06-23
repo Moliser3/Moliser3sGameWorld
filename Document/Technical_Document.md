@@ -469,6 +469,9 @@ Tick (每帧):
 
 | 日期 | 修改内容 | 涉及文件 |
 |------|---------|---------|
+| 06/23 | **[新增] UI点击穿透阻断**：`IsMouseOverUI` + Slate SObjectWidget检测 | WorldPlayerController.h/.cpp |
+| 06/23 | **[新增] 背包拖拽交换**：`SwapItems` + `BeginBatch/EndBatch` | InventoryComponent.h/.cpp, BaseCharacter.cpp |
+| 06/23 | **[修复] DPI鼠标坐标**：`GetCursorPos` 替代 `GetMousePosition` | WorldPlayerController.cpp |
 | 06/22 | **[重构] 技能范围改为阶段级**：`MaxSkillRange` 移至 `FSkillStage.SkillRange` | SkillTypes.h, SkillBase.h/.cpp, MeleeSlashSkill.cpp, JumpSkill.cpp, SkillSystemComponent.cpp |
 | 06/22 | **[新增] 背包系统**：InventoryComponent(30格) + QuickSlotComponent(8格) | Component/Inventory/* |
 | 06/22 | **[新增] UConsumableItem 消耗品基类** | Data/ConsumableItem.h/.cpp |
