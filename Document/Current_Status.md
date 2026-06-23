@@ -1,6 +1,6 @@
 # 当前工作状态
 
-> 最后更新：2026/06/22 17:54
+> 最后更新：2026/06/22 19:30
 
 ## 当前阶段
 第一阶段（基础完善）**全部完成** ✅
@@ -59,6 +59,14 @@
 ### 四十七、Debug 背包测试
 - **`BaseCharacter.h`**：新增 `TestInventoryItems` 数组，蓝图中直接赋值，`BeginPlay` 自动入背包
 - **标记删除**：以 `【Debug 背包测试 — 上线前需删除】` 标记
+
+### 四十八、技能范围改为阶段级配置
+- **`FSkillStage` 新增 `SkillRange`**（DisplayName="技能范围"），替代原有的技能级 `MaxSkillRange`
+- **`SkillBase` 移除 `MaxSkillRange`**，新增 `GetSkillRange()` 从当前阶段读取
+- **`MeleeSlashSkill::ApplyDamage`** 改使用 `GetSkillRange()` 进行球形检测
+- **`GetMaxSkillRange()`** 改为遍历所有技能的所有阶段取最大值
+- **`JumpSkill` 适配**：`Stage0.SkillRange = -1`
+- **修复问题**：第三阶段前摇较长时角色偏移导致 `MaxSkillRange` 不够大而无法命中的 Bug
 
 ## 已完成工作（06/21）
 

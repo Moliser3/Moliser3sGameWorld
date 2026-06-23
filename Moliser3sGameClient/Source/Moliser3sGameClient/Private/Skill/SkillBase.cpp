@@ -53,3 +53,8 @@ float USkillBase::GetCustomLinkTime() const
 {
 	return Stages.IsValidIndex(CurrentStage) ? Stages[CurrentStage].CustomLinkTime : 0.2f;
 }
+
+float USkillBase::GetSkillRange() const
+{
+	return Stages.IsValidIndex(CurrentStage) ? Stages[CurrentStage].SkillRange : 50.0f;
+}

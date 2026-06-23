@@ -60,6 +60,9 @@ struct FSkillStage
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.0", DisplayName = "最大高度差"))
 	float MaxZDiff = 150.0f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.0", DisplayName = "技能范围"))
+	float SkillRange = 50.0f;
+
 	/** 该阶段的五行属性 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "阶段五行"))
 	ESkillWuXing SkillWuXing = ESkillWuXing::Jin;

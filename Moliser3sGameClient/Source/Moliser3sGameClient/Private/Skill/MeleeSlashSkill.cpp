@@ -47,7 +47,7 @@ void UMeleeSlashSkill::ApplyDamage(AActor* Instigator)
 	FCollisionQueryParams QueryParams;
 	QueryParams.AddIgnoredActor(Instigator);
 
-	FCollisionShape Sphere = FCollisionShape::MakeSphere(MaxSkillRange);
+	FCollisionShape Sphere = FCollisionShape::MakeSphere(GetSkillRange());
 	TArray<FOverlapResult> Overlaps;
 
 	Instigator->GetWorld()->OverlapMultiByChannel(

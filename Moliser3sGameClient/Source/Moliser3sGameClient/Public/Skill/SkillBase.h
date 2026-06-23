@@ -35,9 +35,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill", meta = (DisplayName = "技能类型"))
 	ESkillType SkillType = ESkillType::None;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill", meta = (DisplayName = "最大释放技能距离"))
-	float MaxSkillRange = 100.0f;
-
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill", meta = (DisplayName = "技能分类"))
 	ESkillCategory SkillCategory = ESkillCategory::Attack;
 
@@ -50,6 +47,7 @@ public:
 	float GetWindupTime() const;
 	float GetRecoveryTime() const;
 	float GetCustomLinkTime() const;
+	float GetSkillRange() const;
 
 private:
 	int32 CurrentStage = 0;

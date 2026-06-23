@@ -16,9 +16,9 @@
 UJumpSkill::UJumpSkill()
 {
 	SkillCategory = ESkillCategory::Movement;
-	MaxSkillRange = -1;
 
 	FSkillStage& Stage0 = Stages.AddDefaulted_GetRef();
+	Stage0.SkillRange = -1;
 	Stage0.WindupTime = 0.72f;
 	Stage0.RecoveryTime = 1.35f;
 	Stage0.CustomLinkTime = 0.2f;

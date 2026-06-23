@@ -48,7 +48,7 @@ void USkillSystemComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 
 		if (Elapsed >= CachedLinkDuration)
 		{
-				LeftGroupIndex = 0;
+			LeftGroupIndex = 0;
 			RightGroupIndex = 0;
 			LeftLastSkillType = ESkillType::None;
 			LeftStageForType = 0;
@@ -147,14 +147,19 @@ float USkillSystemComponent::GetMaxSkillRange() const
 {
 	auto FindMaxRange = [](const TArray<TObjectPtr<USkillBase>>& Group) -> float
 	{
+		float Max = -1.0f;
 		for (const auto& Skill : Group)
 		{
-			if (Skill && Skill->MaxSkillRange > 0)
+			if (Skill)
 			{
-				return Skill->MaxSkillRange;
+				for (const auto& Stage : Skill->Stages)
+				{
+					if (Stage.SkillRange > Max)
+						Max = Stage.SkillRange;
+				}
 			}
 		}
-		return -1.0f;
+		return Max;
 	};
 
 	float LeftRange = FindMaxRange(LeftSkillGroup);
