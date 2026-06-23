@@ -2,7 +2,7 @@
 
 > 引擎：Unreal Engine 5.7  
 > 语言：C++  
-> 最后更新：2026/06/22
+> 最后更新：2026/06/23
 
 ---
 
@@ -26,8 +26,8 @@ Moliser3sGameClient/Source/
 │   ├── Facing/FacingComponent.h/.cpp        # 朝向控制组件
 │   ├── Input/ClickDetectionComponent.h/.cpp # 点击检测组件
 │   ├── Inventory/
-│   │   ├── InventoryComponent.h/.cpp        # 背包组件（30格+堆叠+事件）
-│   │   └── QuickSlotComponent.h/.cpp        # 快捷栏组件（8格+数字键）
+│   │   ├── InventoryComponent.h/.cpp        # 背包组件（30格+堆叠+事件，纯数据组件，无Tick）
+│   │   └── QuickSlotComponent.h/.cpp        # 快捷栏组件（10格+数字键+交换+使用即消）
 │   ├── Camera/CameraControllerComponent.h/.cpp # 摄像机控制
 │   └── Skill/SkillSystemComponent.h/.cpp     # 技能系统组件
 ├── Skill/
@@ -101,8 +101,8 @@ Build.bat Moliser3sGameClientEditor Win64 Development -Project="项目路径\Mol
 | `UAttributeComponent` | 角色 | 血量/法力/攻击/防御属性 |
 | `UDamageCalculatorComponent` | 角色 | 最终伤害计算（含暴击、防御减免） |
 | `UEquipmentComponent` | 角色 | 装备管理（14槽位+双手武器锁定+五行加成应用） |
-| `UInventoryComponent` | 角色 | 背包（30格+堆叠+拾取/丢弃/使用+事件广播） |
-| `UQuickSlotComponent` | 玩家 | 快捷栏（8格+数字键触发） |
+| `UInventoryComponent` | 角色 | 背包（30格+堆叠+拾取/丢弃/使用+事件广播，纯数据组件，无Tick，拖拽由UMG驱动） |
+| `UQuickSlotComponent` | 玩家 | 快捷栏（10格+数字键触发+内部交换+使用即消） |
 | `UFacingComponent` | 玩家 | Walking/Aiming 两种朝向模式 |
 | `UClickDetectionComponent` | Controller | 屏幕鼠标射线检测 |
 | `USkillSystemComponent` | 玩家 | 双技能组管理 + 四阶段状态机 |
@@ -488,3 +488,78 @@ Tick (每帧):
 | 06/15 | **[新增] 玩家行为状态系统**：EPlayerState(Default/Battle) | WorldPlayerController, PlayerCharacter |
 | 06/14 | **[重构] 技能系统三段式生命周期** | SkillBase, SkillSystemComponent |
 | 06/13 | **[修复] 跳跃后摇期无法打断** | JumpSkill, SkillSystemComponent |
+| 06/23 | **[重构] 背包组件纯数据化**：移除Tick/拖拽状态，`RemoveItem` 索引稳定化 | InventoryComponent.h/.cpp |
+| 06/23 | **[新增] 拖拽丢弃**：`DropItem` 生成 `WorldItemActor`，拖拽检测转由UMG蓝图处理 | InventoryComponent.h/.cpp |
+| 06/23 | **[增强] 快捷栏 8→10 格**：新增 `SwapSlots`，`UseSlot` 使用后自动 `ClearSlot` | QuickSlotComponent.h/.cpp |
+| 06/23 | **[新增] 快捷键映射**：`OnQuickSlotKeyPressed(SlotIndex)` 绑定 1-0 键 | WorldPlayerController.h/.cpp |
+| 06/23 | **[计划 T0] WBP_QuickSlotPanel**：10 格 UMG + 双向拖拽 + 快捷键交互（待搭建） | UMG 蓝图 |
+
+---
+
+## 一〇、背包系统
+
+### 10.1 架构设计
+
+- **`UInventoryComponent`** 为**纯数据组件**，不开启 Tick，不存储拖拽状态
+- 所有交互（拖拽、丢弃、交换）由 UMG 蓝图负责判断
+- 背包为固定格子模式，物品槽位用 `TArray<TObjectPtr<UItemBase>>` 表示，空位为 `nullptr`
+
+### 10.2 操作方法
+
+| 函数 | 作用 |
+|------|------|
+| `AddItem(Item)` | 自动堆叠/找空位插入 |
+| `RemoveItem(Index, Count)` | `Items[Index] = nullptr`（不移动其他物品位置） |
+| `DropItem(Index, Count)` | 生成 `WorldItemActor`（角色前方 100cm）+ 置空格子 |
+| `SwapItems(IndexA, IndexB)` | 交换两个格子，支持空格 |
+| `UseItem(Index)` | 调用 `Item->Use(Owner)` |
+
+### 10.3 拖拽丢弃行为矩阵（UMG 蓝图）
+
+```
+WBP_InventorySlot.OnDragDetected
+  └─ 创建 DragDropOperation (Payload = SlotIndex, DefaultDragVisual = 物品Icon)
+      └─ DragDropOperation.OnDrop (鼠标松开时总触发)
+          ├─ 鼠标在 WBP_InventoryPanel 范围内
+          │   └─ 找到鼠标所在目标格子 → InventoryComponent.SwapItems(源Index, 目标Index)
+          └─ 鼠标在 WBP_InventoryPanel 范围外
+              └─ InventoryComponent.DropItem(源Index, 1)
+```
+
+> 位置检测用 `GetCachedGeometry().IsUnderPoint(鼠标坐标)` 判断鼠标是否在面板几何体内。
+
+---
+
+## 十一、快捷栏系统
+
+### 11.1 架构
+
+- **`UQuickSlotComponent`** 挂在 `APlayerCharacter` 上（仅玩家拥有）
+- 与 `InventoryComponent` 独立：快捷栏物品单独持有，非背包映射
+- 10 格固定槽位，快捷键 1-0
+
+### 11.2 C++ 接口
+
+| 函数 | 作用 |
+|------|------|
+| `AssignSlot(Index, Item)` | 将物品放入快捷栏格子 |
+| `ClearSlot(Index)` | 清空格子 |
+| `UseSlot(Index)` | 使用物品 → 自动 `ClearSlot`（消耗即消） |
+| `SwapSlots(IndexA, IndexB)` | 交换两个格子 |
+| `GetSlotItem(Index)` | 获取格子物品 |
+
+**控制器入口：**
+- `WorldPlayerController::OnQuickSlotKeyPressed(SlotIndex)`
+  - 取 `PlayerCharacter → GetQuickSlot → UseSlot(SlotIndex)`
+  - 蓝图绑定 10 个数字键（1-0）调用此函数
+
+### 11.3 拖拽交互矩阵（UMG 蓝图待搭建）
+
+| 操作 | 源 → 目标 | 逻辑 |
+|------|-----------|------|
+| 拖拽 | 🎒 背包 → 🔲 快捷栏 | `Inventory.RemoveItem(源)` + `QuickSlot.AssignSlot(目标, 物品)` |
+| 拖拽 | 🔲 快捷栏 → 🎒 背包 | `QuickSlot.ClearSlot(源)` + `Inventory.AddItem(物品)` |
+| 拖拽 | 🔲 快捷栏 → 🔲 快捷栏 | `QuickSlot.SwapSlots(源, 目标)` |
+| 拖拽 | 🔲 快捷栏 → 地面 | `SpawnActor WorldItemActor`(ItemData) + `QuickSlot.ClearSlot(源)` |
+| 快捷键 1-0 | 无 → 🔲 快捷栏 | `OnQuickSlotKeyPressed(Index)` → `UseSlot` → `ClearSlot` |
+| 右键 | 🔲 快捷栏 | `UseSlot(Index)` → `ClearSlot` |

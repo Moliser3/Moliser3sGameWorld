@@ -3,6 +3,7 @@
 #include "Component/Camera/CameraControllerComponent.h"
 #include "Component/Facing/FacingComponent.h"
 #include "Component/Skill/SkillSystemComponent.h"
+#include "Component/Inventory/QuickSlotComponent.h"
 #include "Skill/SkillBase.h"
 #include "Animation/AnimInstance.h"
 #include "EnhancedInputSubsystems.h"
@@ -280,4 +281,15 @@ void AWorldPlayerController::OnAltPressed()
 void AWorldPlayerController::OnAltReleased()
 {
 	bDefending = false;
+}
+
+void AWorldPlayerController::OnQuickSlotKeyPressed(int32 SlotIndex)
+{
+	APlayerCharacter* MyCharacter = Cast<APlayerCharacter>(GetPawn());
+	if (!MyCharacter) return;
+
+	UQuickSlotComponent* QuickSlot = MyCharacter->GetQuickSlot();
+	if (!QuickSlot) return;
+
+	QuickSlot->UseSlot(SlotIndex);
 }

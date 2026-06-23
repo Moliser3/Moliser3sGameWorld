@@ -37,6 +37,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Input")
 	void OnAltReleased();
 
+	UFUNCTION(BlueprintCallable, Category = "快捷栏")
+	void OnQuickSlotKeyPressed(int32 SlotIndex);
+
 	UFUNCTION(BlueprintPure, Category = "Click")
 	FVector GetLastClickTarget() const { return LastClickTarget; }
 

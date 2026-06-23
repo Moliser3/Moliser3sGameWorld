@@ -30,6 +30,20 @@ void UQuickSlotComponent::UseSlot(int32 Index)
 	if (!Owner) return;
 
 	Slots[Index]->Use(Owner);
+
+	Slots[Index] = nullptr;
+	OnQuickSlotChanged.Broadcast();
+}
+
+void UQuickSlotComponent::SwapSlots(int32 IndexA, int32 IndexB)
+{
+	if (!Slots.IsValidIndex(IndexA) || !Slots.IsValidIndex(IndexB)) return;
+
+	TObjectPtr<UItemBase> Temp = Slots[IndexA];
+	Slots[IndexA] = Slots[IndexB];
+	Slots[IndexB] = Temp;
+
+	OnQuickSlotChanged.Broadcast();
 }
 
 TArray<UItemBase*> UQuickSlotComponent::GetAllSlots() const

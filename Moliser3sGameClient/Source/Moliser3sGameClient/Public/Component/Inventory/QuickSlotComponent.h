@@ -17,7 +17,7 @@ public:
 	UQuickSlotComponent();
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "快捷栏", meta = (ClampMin = "1"))
-	int32 SlotCount = 8;
+	int32 SlotCount = 10;
 
 	UPROPERTY(BlueprintAssignable, Category = "快捷栏")
 	FOnQuickSlotChanged OnQuickSlotChanged;
@@ -30,6 +30,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "快捷栏")
 	void UseSlot(int32 Index);
+
+	UFUNCTION(BlueprintCallable, Category = "快捷栏")
+	void SwapSlots(int32 IndexA, int32 IndexB);
 
 	UFUNCTION(BlueprintPure, Category = "快捷栏")
 	UItemBase* GetSlotItem(int32 Index) const;

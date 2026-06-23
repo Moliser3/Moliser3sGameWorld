@@ -56,8 +56,7 @@ bool UInventoryComponent::RemoveItem(int32 SlotIndex, int32 Count)
 {
 	if (!Items.IsValidIndex(SlotIndex) || !Items[SlotIndex]) return false;
 
-	Items.RemoveAt(SlotIndex);
-	Items.Add(nullptr);
+	Items[SlotIndex] = nullptr;
 
 	BroadcastChange();
 	return true;
@@ -92,9 +91,10 @@ void UInventoryComponent::DropItem(int32 SlotIndex, int32 Count)
 	if (!Owner) return;
 
 	FVector DropLocation = Owner->GetActorLocation() + Owner->GetActorForwardVector() * 100.0f;
-
 	SpawnWorldItem(DropLocation, Items[SlotIndex].Get());
-	RemoveItem(SlotIndex, Count);
+
+	Items[SlotIndex] = nullptr;
+	BroadcastChange();
 }
 
 void UInventoryComponent::SwapItems(int32 IndexA, int32 IndexB)

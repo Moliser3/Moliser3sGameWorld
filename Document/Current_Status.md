@@ -1,6 +1,6 @@
 # 当前工作状态
 
-> 最后更新：2026/06/23 17:55
+> 最后更新：2026/06/23 22:30
 
 ## 当前阶段
 第一阶段（基础完善）**全部完成** ✅
@@ -8,6 +8,9 @@
 第三阶段（正交状态机重构）—— 双轴状态 + 事件驱动已完成 ✅
 **第四阶段（数据先行 — P2）基本完成** ✅  
 **第五阶段（背包系统 — P3）搭建中 🚧**
+**第六阶段（快捷栏系统 — 终极）待开始 ⏳ T0**
+- 实现 `WBP_QuickSlotPanel`（10格UMG）+ 快捷键 1-0 + 全部拖拽交互
+- 预期工时：2-3 天
 
 ## 已完成工作（06/22）
 
@@ -38,12 +41,10 @@
   - `OnInventoryChanged` 事件广播（UMG UI 刷新用）
 - **挂在 `ABaseCharacter`** 上，所有角色自带背包
 
-### 四十四、快捷栏系统（QuickSlotComponent）
-- **新增 `Component/Inventory/QuickSlotComponent.h/.cpp`**：
-  - 8 格快捷栏，`AssignSlot` / `ClearSlot` / `UseSlot`
-  - `OnQuickSlotChanged` 事件广播
-- **挂在 `APlayerCharacter`** 上，仅玩家拥有
-- 数字键 1-8 在蓝图中绑定 `UseSlot()`
+### 四十四、快捷栏系统（QuickSlotComponent）→ [06/23 晚更新]
+- **`QuickSlotComponent`**：初始 8 格 → **10 格**（`SlotCount = 10`），新增 `SwapSlots(IndexA, IndexB)` 支持快捷栏内部交换
+- **`UseSlot` 改造**：使用后自动 `ClearSlot(Index)`（物品消耗即消）
+- **`WorldPlayerController` 新增 `OnQuickSlotKeyPressed(SlotIndex)`**：数字键 1-0 入口，取 `PlayerCharacter → GetQuickSlot → UseSlot`
 
 ### 四十五、地面物品 Actor
 - **新增 `WorldActors/WorldItemActor.h/.cpp`**：
@@ -87,6 +88,34 @@
 ### 五十一、拖拽Debug日志（随后清理）
 - 添加 `[Swap]` 调试日志验证交换逻辑正确性（已清理）
 - 添加 `[UI调试]` 日志排查点击穿透问题（已清理）
+
+## 已完成工作（06/23 晚）
+
+### 五十二、背包拖拽丢弃重构（纯蓝图交互 + 纯数据组件）
+- **`InventoryComponent` 改为纯数据组件**：移除 `TickComponent`、`bDragActive`、`DragSourceSlotIndex`、`BeginDrag`/`EndDrag`
+- **`RemoveItem` 索引稳定化**：`Items.RemoveAt()+Add(nullptr)` → `Items[SlotIndex] = nullptr`，拖拽交换/丢弃不再打乱其他物品位置
+- **`DropItem` 完善**：丢弃时在角色前方 100cm 生成 `WorldItemActor`（带静态网格体），背包格子置空，可走过去拾取
+- **拖拽检测完全由 UMG 蓝图驱动**（InventoryComponent 不开启 Tick）：
+  - `WBP_InventorySlot.OnDragDetected` → 创建 `DragDropOperation`（Payload=SlotIndex）
+  - `DragDropOperation.OnDrop` → 判断鼠标位置：
+    - 在面板内 → `SwapItems(源Index, 目标Index)`
+    - 在面板外 → `DropItem(源Index, 1)`
+
+### 五十三、快捷栏扩展 10 格 + 快捷键映射
+- **`QuickSlotComponent`**：`SlotCount 8→10`，新增 `SwapSlots`，`UseSlot` 使用后 `ClearSlot`
+- **`WorldPlayerController`**：新增 `OnQuickSlotKeyPressed(SlotIndex)` → `UseSlot`
+- 完成数据层准备，待搭建 `WBP_QuickSlotPanel`（T0 工作）
+
+---
+
+## 🎯 T0 工作 — WBP_QuickSlotPanel（UMG 纯蓝图）
+- 创建 `WBP_QuickSlotPanel`，10 格常驻界面
+- 实现完整拖拽交互矩阵：
+  - 背包 ↔ 快捷栏（双向拖拽）
+  - 快捷栏内部交换（`SwapSlots`）
+  - 快捷栏拖出丢弃（`SpawnWorldItem` + `ClearSlot`）
+  - 快捷键 1-0 调用 `OnQuickSlotKeyPressed`
+  - 右键点击快捷栏使用物品
 
 ## 已完成工作（06/21）
 
