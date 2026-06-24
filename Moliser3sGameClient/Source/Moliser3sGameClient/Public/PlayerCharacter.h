@@ -59,4 +59,10 @@ protected:
 public:
 	UFUNCTION(BlueprintPure, Category = "Facing")
 	float GetBattlePerceptionRange() const { return BattlePerceptionRange; }
+
+	// ============================================================
+	// 【Debug 快捷栏测试 — 上线前需删除】
+	// ============================================================
+	UPROPERTY(EditDefaultsOnly, Instanced, BlueprintReadWrite, Category = "Debug|快捷栏测试")
+	TArray<TObjectPtr<UItemBase>> TestQuickSlotItems;
 };

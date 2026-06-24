@@ -1,16 +1,14 @@
 # 当前工作状态
 
-> 最后更新：2026/06/23 22:30
+> 最后更新：2026/06/24 18:30
 
 ## 当前阶段
 第一阶段（基础完善）**全部完成** ✅
 第二阶段（技能扩展 / 需求变更）**全部完成** ✅
 第三阶段（正交状态机重构）—— 双轴状态 + 事件驱动已完成 ✅
 **第四阶段（数据先行 — P2）基本完成** ✅  
-**第五阶段（背包系统 — P3）搭建中 🚧**
-**第六阶段（快捷栏系统 — 终极）待开始 ⏳ T0**
-- 实现 `WBP_QuickSlotPanel`（10格UMG）+ 快捷键 1-0 + 全部拖拽交互
-- 预期工时：2-3 天
+**第五阶段（背包系统 — P3）搭建中 🚧**  
+**第六阶段（快捷栏系统 — 终极）搭建中 🚧**
 
 ## 已完成工作（06/22）
 
@@ -89,6 +87,46 @@
 - 添加 `[Swap]` 调试日志验证交换逻辑正确性（已清理）
 - 添加 `[UI调试]` 日志排查点击穿透问题（已清理）
 
+## 已完成工作（06/24）
+
+### 五十四、物品堆叠数量系统 + 拆分功能
+- **`InventoryComponent`**：新增 `ItemCounts` 并行计数数组，`AddItem`/`RemoveItem`/`DropItem`/`UseItem`/`SwapItems` 全部适配数量管理
+- **`QuickSlotComponent`**：新增 `ItemCounts` 并行计数数组，`AssignSlot`/`ClearSlot`/`UseSlot`/`SwapSlots`/`DropSlotItem` 全部适配数量管理
+- **`SplitItem(SourceSlot, Count)`**：新增拆分函数，从源格拆出指定数量到空格，无空格则返回 false
+- **`SetItemAt(Slot, Item, Count)`**：新增直接写入函数，用于背包↔快捷栏交换时指定目标格
+- **`AddItem(Item, Count)`**：支持批量添加，自动堆叠+找空格
+- **`GetCountAt(Slot)`**：新增获取每格数量的函数
+- 涉及文件：`InventoryComponent.h/.cpp`，`QuickSlotComponent.h/.cpp`
+
+### 五十五、物品拖拽叠加功能
+- **`TryStackOrSwap(Source, Target)`**：同 ID 且未满时叠加数量，否则退化为交换
+- 背包和快捷栏各有一套实现
+- **`SwapWithInventory`** 新增方向感知：`bFromInventory` 参数指定拖拽来源，确保正确方向优先叠加
+- 涉及文件：`InventoryComponent.h/.cpp`，`QuickSlotComponent.h/.cpp`
+
+### 五十六、拖拽操作数据结构（C++）
+- **新增 `UI/ItemDragDropOperation.h`**：`UItemDragDropOperation`（继承 `UDragDropOperation`）
+- **`ESlotContainerType`**：`Inventory` / `QuickSlot` 枚举
+- **`SourceContainer`**、`SourceSlotIndex`、`DraggedItem** 字段，蓝图中可直接读写
+- 涉及文件：`Public/UI/ItemDragDropOperation.h`
+
+### 五十七、背包↔快捷栏交互函数（组件化重构）
+- **`QuickSlotComponent::SwapWithInventory(InvIdx, QSIdx, bFromInventory)`**：统一处理背包与快捷栏之间的交换/叠加
+- **`QuickSlotComponent::DropSlotItem(Index)`**：丢弃快捷栏物品到场景，与 `Inventory.DropItem` 调用方式统一
+- **`Controller::DropQuickSlotItem`** 改为委托给 `QuickSlotComponent::DropSlotItem`
+- **移除** `WorldPlayerController::SwapInventoryWithQuickSlot`、`TransferInventoryToQuickSlot`、`TransferQuickSlotToInventory`
+- 涉及文件：`QuickSlotComponent.h/.cpp`，`WorldPlayerController.h/.cpp`
+
+### 五十八、Debug 快捷栏测试
+- 沿用 `BaseCharacter::TestInventoryItems` 模式，`PlayerCharacter` 新增 `TestQuickSlotItems` 数组
+- 蓝图中可直接赋值，`BeginPlay` 自动填入对应槽位
+
+### 五十九、全链路 Debug 日志
+- `[背包]` 标签：`AddItem`/`RemoveItem`/`DropItem`/`UseItem`/`SwapItems`/`TryStackOrSwap`/`SplitItem`
+- `[快捷栏]` 标签：`AssignSlot`/`ClearSlot`/`UseSlot`/`SwapSlots`/`DropSlotItem`/`SwapWithInventory`/`TryStackOrSwap`/`SplitItem`
+- `[Controller]` 标签：快捷键按下、`DropQuickSlotItem`
+- 每个函数输出：操作名+槽位索引+物品ID+数量+结果
+
 ## 已完成工作（06/23 晚）
 
 ### 五十二、背包拖拽丢弃重构（纯蓝图交互 + 纯数据组件）
@@ -108,14 +146,16 @@
 
 ---
 
-## 🎯 T0 工作 — WBP_QuickSlotPanel（UMG 纯蓝图）
-- 创建 `WBP_QuickSlotPanel`，10 格常驻界面
-- 实现完整拖拽交互矩阵：
-  - 背包 ↔ 快捷栏（双向拖拽）
-  - 快捷栏内部交换（`SwapSlots`）
-  - 快捷栏拖出丢弃（`SpawnWorldItem` + `ClearSlot`）
-  - 快捷键 1-0 调用 `OnQuickSlotKeyPressed`
-  - 右键点击快捷栏使用物品
+## 🎯 待办工作
+### UMG 蓝图（纯蓝图）
+- `WBP_QuickSlot`：单个快捷栏格子，拖拽逻辑（SwapWithInventory/TryStackOrSwap/DropSlotItem）
+- `WBP_ItemContextMenu`：右键菜单（使用/丢弃/拆分）
+- `WBP_SplitInputDialog`：拆分数量输入弹窗（可选）
+- Panel 绑定事件刷新（OnQuickSlotChanged / OnInventoryChanged）
+- 拖拽面板范围检测（bDragInside）
+
+### C++
+- 无待办（当前阶段所有 C++ 逻辑已完成）
 
 ## 已完成工作（06/21）
 
@@ -256,6 +296,7 @@
 
 ## 已知问题
 - SimpleMoveToLocation 的精确度有限（约 50cm 容差），Tick 中 bPendingAttack 的到达判断使用 80cm 容差补偿
+- 背包拖拽丢弃（OnDragCancelled）调用的 `DropItem(SlotIndex)` 默认 Count=1，需手动改为 `DropItem(Slot, GetCountAt(Slot))` 才能丢弃全部
 
 ## 对话备注
 - **Moliser3**：项目拥有者

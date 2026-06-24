@@ -40,6 +40,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "快捷栏")
 	void OnQuickSlotKeyPressed(int32 SlotIndex);
 
+	UFUNCTION(BlueprintCallable, Category = "背包|拖拽")
+	void DropQuickSlotItem(int32 QuickSlotIndex);
+
 	UFUNCTION(BlueprintPure, Category = "Click")
 	FVector GetLastClickTarget() const { return LastClickTarget; }
 

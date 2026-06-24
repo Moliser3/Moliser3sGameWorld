@@ -2,7 +2,7 @@
 
 > 引擎：Unreal Engine 5.7  
 > 语言：C++  
-> 最后更新：2026/06/23
+> 最后更新：2026/06/24
 
 ---
 
@@ -43,6 +43,8 @@ Moliser3sGameClient/Source/
 │   ├── ItemBase.h                           # 物品基类（Use+WorldMesh+Icon缓存）
 │   ├── EquipItem.h/.cpp                     # 可装备物品（五行加成）
 │   └── ConsumableItem.h/.cpp                # 消耗品基类（回血/回蓝/增益）
+├── UI/
+│   └── ItemDragDropOperation.h              # 拖拽操作数据（ESlotContainerType + 来源信息）
 └── WorldActors/
     └── WorldItemActor.h/.cpp                # 地面物品 Actor（Mesh+拾取）
 ```
@@ -101,8 +103,8 @@ Build.bat Moliser3sGameClientEditor Win64 Development -Project="项目路径\Mol
 | `UAttributeComponent` | 角色 | 血量/法力/攻击/防御属性 |
 | `UDamageCalculatorComponent` | 角色 | 最终伤害计算（含暴击、防御减免） |
 | `UEquipmentComponent` | 角色 | 装备管理（14槽位+双手武器锁定+五行加成应用） |
-| `UInventoryComponent` | 角色 | 背包（30格+堆叠+拾取/丢弃/使用+事件广播，纯数据组件，无Tick，拖拽由UMG驱动） |
-| `UQuickSlotComponent` | 玩家 | 快捷栏（10格+数字键触发+内部交换+使用即消） |
+| `UInventoryComponent` | 角色 | 背包（30格+数量管理+堆叠/拆分+拾取/丢弃/使用+事件广播，纯数据组件，无Tick） |
+| `UQuickSlotComponent` | 玩家 | 快捷栏（10格+数量管理+堆叠/拆分+背包交换+数字键触发） |
 | `UFacingComponent` | 玩家 | Walking/Aiming 两种朝向模式 |
 | `UClickDetectionComponent` | Controller | 屏幕鼠标射线检测 |
 | `USkillSystemComponent` | 玩家 | 双技能组管理 + 四阶段状态机 |
@@ -503,30 +505,42 @@ Tick (每帧):
 - **`UInventoryComponent`** 为**纯数据组件**，不开启 Tick，不存储拖拽状态
 - 所有交互（拖拽、丢弃、交换）由 UMG 蓝图负责判断
 - 背包为固定格子模式，物品槽位用 `TArray<TObjectPtr<UItemBase>>` 表示，空位为 `nullptr`
+- **并行计数数组** `TArray<int32> ItemCounts` 与 `Items` 一一对应，管理每格数量
 
 ### 10.2 操作方法
 
 | 函数 | 作用 |
 |------|------|
-| `AddItem(Item)` | 自动堆叠/找空位插入 |
-| `RemoveItem(Index, Count)` | `Items[Index] = nullptr`（不移动其他物品位置） |
-| `DropItem(Index, Count)` | 生成 `WorldItemActor`（角色前方 100cm）+ 置空格子 |
-| `SwapItems(IndexA, IndexB)` | 交换两个格子，支持空格 |
-| `UseItem(Index)` | 调用 `Item->Use(Owner)` |
+| `AddItem(Item, Count=1)` | 自动堆叠/找空位插入，支持数量 |
+| `RemoveItem(Index, Count=1)` | 减少数量，归零则置空格子 |
+| `DropItem(Index, Count=1)` | 生成 `WorldItemActor`（角色前方 100cm）+ 减数量 |
+| `SwapItems(IndexA, IndexB)` | 交换两个格子（含数量），支持空格 |
+| `UseItem(Index)` | 调用 `Item->Use(Owner)`，次数-1，归零清空 |
+| `SetItemAt(Index, Item, Count=1)` | 直接写入指定格子（含数量） |
+| `GetItemAt(Index)` | 获取格子物品指针 |
+| `GetCountAt(Index)` | 获取格子当前数量 |
+| `GetItemCount(ItemID)` | 获取全背包某物品总数量 |
+| `TryStackOrSwap(Source, Target)` | 同ID未满则叠加，否则交换 |
+| `SplitItem(Source, Count)` | 从源格拆分Count个到空格，无空格返回false |
+| `BeginBatch()` / `EndBatch()` | 批量操作期间不广播事件 |
 
-### 10.3 拖拽丢弃行为矩阵（UMG 蓝图）
+### 10.3 拖拽交互矩阵（UMG 蓝图）
 
 ```
 WBP_InventorySlot.OnDragDetected
-  └─ 创建 DragDropOperation (Payload = SlotIndex, DefaultDragVisual = 物品Icon)
-      └─ DragDropOperation.OnDrop (鼠标松开时总触发)
-          ├─ 鼠标在 WBP_InventoryPanel 范围内
-          │   └─ 找到鼠标所在目标格子 → InventoryComponent.SwapItems(源Index, 目标Index)
-          └─ 鼠标在 WBP_InventoryPanel 范围外
-              └─ InventoryComponent.DropItem(源Index, 1)
-```
+  └─ 创建 UItemDragDropOperation (SourceContainer, SourceSlotIndex)
+      └─ WBP_InventorySlot.OnDrop
+          ├─ Source=Inventory → TryStackOrSwap(源, 目标)
+          ├─ Source=QuickSlot → QuickSlot.SwapWithInventory(我, 源, false)
+          └─ 面板外 → DropItem(我, GetCountAt(我))
 
-> 位置检测用 `GetCachedGeometry().IsUnderPoint(鼠标坐标)` 判断鼠标是否在面板几何体内。
+WBP_QuickSlot.OnDragDetected
+  └─ 创建 UItemDragDropOperation (SourceContainer, SourceSlotIndex)
+      └─ WBP_QuickSlot.OnDrop
+          ├─ Source=Inventory → QuickSlot.SwapWithInventory(源, 我, true)
+          ├─ Source=QuickSlot → TryStackOrSwap(源, 我)
+          └─ 面板外 → DropSlotItem(我)
+```
 
 ---
 
@@ -536,30 +550,53 @@ WBP_InventorySlot.OnDragDetected
 
 - **`UQuickSlotComponent`** 挂在 `APlayerCharacter` 上（仅玩家拥有）
 - 与 `InventoryComponent` 独立：快捷栏物品单独持有，非背包映射
-- 10 格固定槽位，快捷键 1-0
+- 10 格固定槽位（`SlotCount=10`），快捷键 1-0
+- **并行计数数组** `TArray<int32> ItemCounts` 与 `Slots` 一一对应，管理每格数量
 
 ### 11.2 C++ 接口
 
 | 函数 | 作用 |
 |------|------|
-| `AssignSlot(Index, Item)` | 将物品放入快捷栏格子 |
+| `AssignSlot(Index, Item, Count=1)` | 将物品放入快捷栏格子（含数量） |
 | `ClearSlot(Index)` | 清空格子 |
-| `UseSlot(Index)` | 使用物品 → 自动 `ClearSlot`（消耗即消） |
-| `SwapSlots(IndexA, IndexB)` | 交换两个格子 |
-| `GetSlotItem(Index)` | 获取格子物品 |
+| `UseSlot(Index)` | 使用物品，次数-1，归零清空 |
+| `SwapSlots(IndexA, IndexB)` | 交换两个格子（含数量） |
+| `DropSlotItem(Index)` | 丢弃快捷栏物品到场景（全部丢弃） |
+| `GetSlotItem(Index)` | 获取格子物品指针 |
+| `GetCountAt(Index)` | 获取格子当前数量 |
+| `TryStackOrSwap(Source, Target)` | 同ID未满则叠加，否则交换 |
+| `SplitItem(Source, Count)` | 从源格拆分Count个到空格，无空格返回false |
+| `SwapWithInventory(InvIdx, QSIdx, bFromInventory)` | 背包↔快捷栏交换/叠加（方向感知） |
 
 **控制器入口：**
 - `WorldPlayerController::OnQuickSlotKeyPressed(SlotIndex)`
   - 取 `PlayerCharacter → GetQuickSlot → UseSlot(SlotIndex)`
   - 蓝图绑定 10 个数字键（1-0）调用此函数
 
-### 11.3 拖拽交互矩阵（UMG 蓝图待搭建）
+### 11.3 拖拽交互矩阵
 
-| 操作 | 源 → 目标 | 逻辑 |
+| 操作 | 源 → 目标 | 调用 |
 |------|-----------|------|
-| 拖拽 | 🎒 背包 → 🔲 快捷栏 | `Inventory.RemoveItem(源)` + `QuickSlot.AssignSlot(目标, 物品)` |
-| 拖拽 | 🔲 快捷栏 → 🎒 背包 | `QuickSlot.ClearSlot(源)` + `Inventory.AddItem(物品)` |
-| 拖拽 | 🔲 快捷栏 → 🔲 快捷栏 | `QuickSlot.SwapSlots(源, 目标)` |
-| 拖拽 | 🔲 快捷栏 → 地面 | `SpawnActor WorldItemActor`(ItemData) + `QuickSlot.ClearSlot(源)` |
-| 快捷键 1-0 | 无 → 🔲 快捷栏 | `OnQuickSlotKeyPressed(Index)` → `UseSlot` → `ClearSlot` |
-| 右键 | 🔲 快捷栏 | `UseSlot(Index)` → `ClearSlot` |
+| 拖拽 | 🎒 背包 → 🔲 快捷栏 | `QuickSlot.SwapWithInventory(源, 我, true)` |
+| 拖拽 | 🔲 快捷栏 → 🎒 背包 | `QuickSlot.SwapWithInventory(我, 源, false)` |
+| 拖拽 | 🔲 快捷栏 → 🔲 快捷栏 | `QuickSlot.TryStackOrSwap(源, 目标)` |
+| 拖拽 | 🎒 背包 → 🎒 背包 | `Inventory.TryStackOrSwap(源, 目标)` |
+| 拖拽 | 🔲 快捷栏 → 地面 | `QuickSlot.DropSlotItem(我)` |
+| 拖拽 | 🎒 背包 → 地面 | `Inventory.DropItem(我, GetCountAt(我))` |
+| 快捷键 1-0 | 无 → 🔲 快捷栏 | `OnQuickSlotKeyPressed(Index)` → `UseSlot` |
+| 右键 | 🔲 快捷栏 | `UseSlot(Index)` |
+| 右键 | 🎒 背包 | 弹出 `WBP_ItemContextMenu`（使用/丢弃/拆分） |
+
+---
+
+## 十二、开发日志
+
+| 日期 | 修改内容 | 涉及文件 |
+|------|---------|---------|
+| 06/24 | **[新增] 物品堆叠数量系统**：ItemCounts并行数组，所有函数适配数量管理 | InventoryComponent.h/.cpp, QuickSlotComponent.h/.cpp |
+| 06/24 | **[新增] 拆分功能 SplitItem**：从源格拆分到空格，无空格返回false | InventoryComponent.h/.cpp, QuickSlotComponent.h/.cpp |
+| 06/24 | **[新增] 拖拽叠加 TryStackOrSwap**：同ID未满叠加，否则交换 | InventoryComponent.h/.cpp, QuickSlotComponent.h/.cpp |
+| 06/24 | **[新增] SwapWithInventory方向感知**：bFromInventory参数决定优先叠加方向 | QuickSlotComponent.h/.cpp |
+| 06/24 | **[新增] UItemDragDropOperation**：拖拽数据载体（ESlotContainerType+来源信息） | UI/ItemDragDropOperation.h |
+| 06/24 | **[重构] 丢弃逻辑统一**：DropSlotItem移至QuickSlotComponent | QuickSlotComponent.h/.cpp, WorldPlayerController.h/.cpp |
+| 06/24 | **[新增] 调试日志全链路**：背包/快捷栏/Controller三标签覆盖全部数据操作 | InventoryComponent.cpp, QuickSlotComponent.cpp, WorldPlayerController.cpp |

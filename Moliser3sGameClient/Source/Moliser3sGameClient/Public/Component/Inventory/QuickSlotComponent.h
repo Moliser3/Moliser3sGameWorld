@@ -23,7 +23,7 @@ public:
 	FOnQuickSlotChanged OnQuickSlotChanged;
 
 	UFUNCTION(BlueprintCallable, Category = "快捷栏")
-	bool AssignSlot(int32 Index, UItemBase* Item);
+	bool AssignSlot(int32 Index, UItemBase* Item, int32 Count = 1);
 
 	UFUNCTION(BlueprintCallable, Category = "快捷栏")
 	void ClearSlot(int32 Index);
@@ -34,13 +34,31 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "快捷栏")
 	void SwapSlots(int32 IndexA, int32 IndexB);
 
+	UFUNCTION(BlueprintCallable, Category = "快捷栏")
+	bool TryStackOrSwap(int32 SourceSlot, int32 TargetSlot);
+
 	UFUNCTION(BlueprintPure, Category = "快捷栏")
 	UItemBase* GetSlotItem(int32 Index) const;
 
 	UFUNCTION(BlueprintPure, Category = "快捷栏")
+	int32 GetCountAt(int32 Index) const;
+
+	UFUNCTION(BlueprintCallable, Category = "快捷栏")
+	void DropSlotItem(int32 Index);
+
+	UFUNCTION(BlueprintCallable, Category = "快捷栏")
+	void SwapWithInventory(int32 InventorySlotIndex, int32 QuickSlotIndex, bool bFromInventory);
+
+	UFUNCTION(BlueprintPure, Category = "快捷栏")
 	TArray<UItemBase*> GetAllSlots() const;
+
+	UFUNCTION(BlueprintCallable, Category = "快捷栏")
+	bool SplitItem(int32 SourceSlotIndex, int32 SplitCount);
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "快捷栏")
 	TArray<TObjectPtr<UItemBase>> Slots;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "快捷栏")
+	TArray<int32> ItemCounts;
 };

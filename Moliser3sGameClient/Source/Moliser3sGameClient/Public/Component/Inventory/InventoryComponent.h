@@ -24,13 +24,16 @@ public:
 	FOnInventoryChanged OnInventoryChanged;
 
 	UFUNCTION(BlueprintCallable, Category = "背包")
-	bool AddItem(UItemBase* Item);
+	bool AddItem(UItemBase* Item, int32 Count = 1);
 
 	UFUNCTION(BlueprintCallable, Category = "背包")
 	bool RemoveItem(int32 SlotIndex, int32 Count = 1);
 
 	UFUNCTION(BlueprintPure, Category = "背包")
 	UItemBase* GetItemAt(int32 SlotIndex) const;
+
+	UFUNCTION(BlueprintPure, Category = "背包")
+	int32 GetCountAt(int32 SlotIndex) const;
 
 	UFUNCTION(BlueprintPure, Category = "背包")
 	int32 GetItemCount(FName ItemID) const;
@@ -51,7 +54,16 @@ public:
 	void UseItem(int32 SlotIndex);
 
 	UFUNCTION(BlueprintCallable, Category = "背包")
+	void SetItemAt(int32 SlotIndex, UItemBase* Item, int32 Count = 1);
+
+	UFUNCTION(BlueprintCallable, Category = "背包")
 	void SwapItems(int32 IndexA, int32 IndexB);
+
+	UFUNCTION(BlueprintCallable, Category = "背包")
+	bool TryStackOrSwap(int32 SourceSlot, int32 TargetSlot);
+
+	UFUNCTION(BlueprintCallable, Category = "背包")
+	bool SplitItem(int32 SourceSlotIndex, int32 SplitCount);
 
 	UFUNCTION(BlueprintCallable, Category = "背包")
 	void BeginBatch();
@@ -62,6 +74,9 @@ public:
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "背包")
 	TArray<TObjectPtr<UItemBase>> Items;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "背包")
+	TArray<int32> ItemCounts;
 
 	bool bBatchMode = false;
 

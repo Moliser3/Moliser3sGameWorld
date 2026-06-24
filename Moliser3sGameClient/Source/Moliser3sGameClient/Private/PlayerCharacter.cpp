@@ -35,6 +35,17 @@ void APlayerCharacter::BeginPlay()
 		PC->OnCombatStateChanged.AddDynamic(this, &APlayerCharacter::OnCombatStateChanged);
 		PC->OnActionStateChanged.AddDynamic(this, &APlayerCharacter::OnActionStateChanged);
 	}
+
+	// ============================================================
+	// 【Debug 快捷栏测试 — 上线前需删除】
+	// ============================================================
+	for (int32 i = 0; i < TestQuickSlotItems.Num() && i < QuickSlotComponent->SlotCount; i++)
+	{
+		if (TestQuickSlotItems[i])
+		{
+			QuickSlotComponent->AssignSlot(i, TestQuickSlotItems[i]);
+		}
+	}
 }
 
 void APlayerCharacter::OnCombatStateChanged(ECombatState NewCombat)

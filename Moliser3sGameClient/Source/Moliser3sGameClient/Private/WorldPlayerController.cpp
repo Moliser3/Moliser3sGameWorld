@@ -286,10 +286,39 @@ void AWorldPlayerController::OnAltReleased()
 void AWorldPlayerController::OnQuickSlotKeyPressed(int32 SlotIndex)
 {
 	APlayerCharacter* MyCharacter = Cast<APlayerCharacter>(GetPawn());
-	if (!MyCharacter) return;
+	if (!MyCharacter)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[Controller] OnQuickSlotKeyPressed: 未获取到 PlayerCharacter"));
+		return;
+	}
 
 	UQuickSlotComponent* QuickSlot = MyCharacter->GetQuickSlot();
-	if (!QuickSlot) return;
+	if (!QuickSlot)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[Controller] OnQuickSlotKeyPressed: 未获取到 QuickSlotComponent"));
+		return;
+	}
 
+	UE_LOG(LogTemp, Warning, TEXT("[Controller] 快捷键 %d 按下"), SlotIndex + 1);
 	QuickSlot->UseSlot(SlotIndex);
+}
+
+void AWorldPlayerController::DropQuickSlotItem(int32 QuickSlotIndex)
+{
+	APlayerCharacter* MyCharacter = Cast<APlayerCharacter>(GetPawn());
+	if (!MyCharacter)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[Controller] DropQuickSlotItem: 未获取到 PlayerCharacter"));
+		return;
+	}
+
+	UQuickSlotComponent* QS = MyCharacter->GetQuickSlot();
+	if (!QS)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[Controller] DropQuickSlotItem: 未获取到 QuickSlotComponent"));
+		return;
+	}
+
+	UE_LOG(LogTemp, Warning, TEXT("[Controller] DropQuickSlotItem: 触发快捷栏 Slot[%d] 丢弃"), QuickSlotIndex);
+	QS->DropSlotItem(QuickSlotIndex);
 }
