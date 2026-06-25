@@ -1,6 +1,6 @@
 # 当前工作状态
 
-> 最后更新：2026/06/24 18:30
+> 最后更新：2026/06/24 23:00
 
 ## 当前阶段
 第一阶段（基础完善）**全部完成** ✅
@@ -146,16 +146,56 @@
 
 ---
 
-## 🎯 待办工作
-### UMG 蓝图（纯蓝图）
-- `WBP_QuickSlot`：单个快捷栏格子，拖拽逻辑（SwapWithInventory/TryStackOrSwap/DropSlotItem）
-- `WBP_ItemContextMenu`：右键菜单（使用/丢弃/拆分）
-- `WBP_SplitInputDialog`：拆分数量输入弹窗（可选）
-- Panel 绑定事件刷新（OnQuickSlotChanged / OnInventoryChanged）
-- 拖拽面板范围检测（bDragInside）
+## 已完成工作（06/24 晚）
 
-### C++
-- 无待办（当前阶段所有 C++ 逻辑已完成）
+### 六十、物品分类系统（EItemCategory）
+- **新增 `EItemCategory` 枚举**：Equipment / Consumable / Material / QuestItem
+- **`ItemBase` 新增 `ItemCategory` 属性**：所有物品自带分类标记
+- **容器准入规则**：快捷栏仅接受 `Consumable`，装备栏仅接受 `Equipment`，背包全品类
+- **QuickSlotComponent**：`AssignSlot` / `SwapWithInventory` 增加分类检查
+- **EquipmentComponent**：`EquipItem` 增加分类检查
+- **`UConsumableItem` 构造器设默认 `Consumable`**：解决消耗品无法放入快捷栏的问题
+- 涉及文件：`DataDefinitions.h`, `ItemBase.h/.cpp`, `EquipItem.h/.cpp`, `ConsumableItem.h/.cpp`, `QuickSlotComponent.h/.cpp`, `EquipmentComponent.h/.cpp`
+
+### 六十一、物品数据表系统（4 表分离）
+- **新建 `Data/ItemDataTable.h`**：4 个独立行结构体
+  - `FEquipmentDataRow`：装备（EquipSlot / WeaponUsage / 五行加成等）
+  - `FConsumableDataRow`：消耗品（EffectType / EffectValue）
+  - `FMaterialDataRow`：材料（仅基础字段）
+  - `FQuestItemDataRow`：任务物品（仅基础字段）
+- **新建 `Data/ItemFactory.h/.cpp`**：`CreateEquipment` / `CreateConsumable` / `CreateMaterial` / `CreateQuestItem`
+- **删除旧 `FItemDataRow` 和 `InitializeFromRow`**：结构体宏展开为手写字段
+- **全字段中文 DisplayName**：ItemDataTable / ItemBase / EquipItem / ConsumableItem / EquipmentData
+- **`EWeaponUsage` 新增 `None`**：防具饰品统一默认不设武器类型
+- **`EEquipmentSlot` 新增 `Cloak`**：槽位 13 → 14
+- 涉及文件：`ItemDataTable.h`, `ItemFactory.h/.cpp`, `ItemBase.h/.cpp`, `EquipItem.h/.cpp`, `ConsumableItem.h/.cpp`, `EquipmentData.h`
+
+### 六十二、五维属性蓝图接口
+- **`AttributeComponent` 新增 5 个 `BlueprintPure` 函数**：`GetJinLi` / `GetQiXue` / `GetNeiXi` / `GetShenFa` / `GetTiPo`
+- 蓝图中可直接调用获取五维值，无需手动计算
+
+### 六十三、装备栏刷新事件 + SwapWithInventory 返回 bool
+- **`EquipmentComponent` 新增 `OnEquipmentChanged` 事件**：装备穿/卸时广播
+- **`SwapWithInventory` 改为 `bool` 返回**：拖拽被拒绝（如武器→快捷栏）时蓝图可捕获失败
+- **`InventoryComponent` 新增 `NotifyInventoryChanged()`**：蓝图中手动刷新背包显示
+- 涉及文件：`EquipmentComponent.h/.cpp`, `QuickSlotComponent.h/.cpp`, `InventoryComponent.h/.cpp`
+
+### 六十四、披风槽位
+- **`EEquipmentSlot` 新增 `Cloak`**：槽位 13 → 14
+- **`BaseCharacter` 新增 `CloakItem` Debug 属性**：与现有装备测试模式一致
+
+## 🎯 下一步待办
+
+### 背包武器↔角色面板武器槽交互（下阶段核心）
+- 从背包拖拽武器到角色面板武器槽位 → `EquipmentComponent.EquipItem(Item)`
+- 从角色面板拖拽卸下武器 → `UnequipItem(Slot)` + 返回背包
+- 面板 14 个槽位 + 属性全量刷新
+
+### UMG 蓝图（纯蓝图，随交互逐步完善）
+- `WBP_QuickSlot`：快捷栏格子拖拽逻辑
+- `WBP_ItemContextMenu`：右键菜单条件显示
+- `WBP_CharacterPanel`：角色面板布局
+- Panel 事件绑定刷新
 
 ## 已完成工作（06/21）
 

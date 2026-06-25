@@ -95,6 +95,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Instanced, BlueprintReadWrite, Category = "Debug|装备测试", meta = (DisplayName = "靴子"))
 	TObjectPtr<UEquipItem> BootsItem;
 
+	UPROPERTY(EditDefaultsOnly, Instanced, BlueprintReadWrite, Category = "Debug|装备测试", meta = (DisplayName = "披风"))
+	TObjectPtr<UEquipItem> CloakItem;
+
 	UPROPERTY(EditDefaultsOnly, Instanced, BlueprintReadWrite, Category = "Debug|装备测试", meta = (DisplayName = "项链"))
 	TObjectPtr<UEquipItem> AmuletItem;
 

@@ -2,6 +2,11 @@
 #include "Component/Attribute/AttributeComponent.h"
 #include "GameFramework/Actor.h"
 
+UConsumableItem::UConsumableItem()
+{
+	ItemCategory = EItemCategory::Consumable;
+}
+
 void UConsumableItem::Use_Implementation(AActor* User)
 {
 	if (!User) return;

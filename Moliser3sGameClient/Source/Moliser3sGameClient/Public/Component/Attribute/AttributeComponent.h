@@ -82,6 +82,22 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Combat")
 	float GetDamageReduction() const { return CharacterData.DamageReduction; }
 
+	// ===== 五维属性 =====
+	UFUNCTION(BlueprintPure, Category = "WuXing")
+	float GetJinLi() const { return CharacterData.GetJinLi(); }
+
+	UFUNCTION(BlueprintPure, Category = "WuXing")
+	float GetQiXue() const { return CharacterData.GetQiXue(); }
+
+	UFUNCTION(BlueprintPure, Category = "WuXing")
+	float GetNeiXi() const { return CharacterData.GetNeiXi(); }
+
+	UFUNCTION(BlueprintPure, Category = "WuXing")
+	float GetShenFa() const { return CharacterData.GetShenFa(); }
+
+	UFUNCTION(BlueprintPure, Category = "WuXing")
+	float GetTiPo() const { return CharacterData.GetTiPo(); }
+
 	// ===== 五行派生便捷接口 =====
 	UFUNCTION(BlueprintPure, Category = "WuXing")
 	float GetAttackPower() const { return CharacterData.GetAttackPower(); }

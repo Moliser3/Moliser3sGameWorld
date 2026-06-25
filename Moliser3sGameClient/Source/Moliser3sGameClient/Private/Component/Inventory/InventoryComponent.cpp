@@ -26,6 +26,11 @@ void UInventoryComponent::EndBatch()
 	OnInventoryChanged.Broadcast();
 }
 
+void UInventoryComponent::NotifyInventoryChanged()
+{
+	BroadcastChange();
+}
+
 bool UInventoryComponent::AddItem(UItemBase* Item, int32 Count)
 {
 	if (!Item || Count <= 0)

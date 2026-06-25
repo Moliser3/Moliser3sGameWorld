@@ -71,6 +71,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "背包")
 	void EndBatch();
 
+	UFUNCTION(BlueprintCallable, Category = "背包")
+	void NotifyInventoryChanged();
+
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "背包")
 	TArray<TObjectPtr<UItemBase>> Items;

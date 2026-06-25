@@ -600,3 +600,9 @@ WBP_QuickSlot.OnDragDetected
 | 06/24 | **[新增] UItemDragDropOperation**：拖拽数据载体（ESlotContainerType+来源信息） | UI/ItemDragDropOperation.h |
 | 06/24 | **[重构] 丢弃逻辑统一**：DropSlotItem移至QuickSlotComponent | QuickSlotComponent.h/.cpp, WorldPlayerController.h/.cpp |
 | 06/24 | **[新增] 调试日志全链路**：背包/快捷栏/Controller三标签覆盖全部数据操作 | InventoryComponent.cpp, QuickSlotComponent.cpp, WorldPlayerController.cpp |
+| 06/24 | **[新增] 物品分类系统 EItemCategory**：快捷栏/装备栏容器准入规则 + ConsumableItem默认值 | DataDefinitions.h, ItemBase, EquipItem, ConsumableItem, QuickSlotComponent, EquipmentComponent |
+| 06/24 | **[新增] 物品数据表 4表分离**：Equipment/Consumable/Material/QuestItem独立行结构体 + 工厂函数 + 全字段中文DisplayName | ItemDataTable.h, ItemFactory.h/.cpp, ItemBase/EquipItem/ConsumableItem |
+| 06/24 | **[新增] 五维属性蓝图接口**：GetJinLi/GetQiXue/GetNeiXi/GetShenFa/GetTiPo | AttributeComponent.h |
+| 06/24 | **[新增] OnEquipmentChanged事件** + SwapWithInventory改为bool返回 + NotifyInventoryChanged | EquipmentComponent, QuickSlotComponent, InventoryComponent |
+| 06/24 | **[新增] 披风槽位 Cloak**：EEquipmentSlot 13→14 | EquipmentData.h, BaseCharacter.h/.cpp, EquipmentComponent.cpp |
+| 06/24 | **[修改] EWeaponUsage新增None**：防具饰品默认值 | EquipmentData.h |

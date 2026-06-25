@@ -8,6 +8,8 @@
 class UEquipItem;
 class UAttributeComponent;
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnEquipmentChanged);
+
 UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class MOLISER3SGAMECLIENT_API UEquipmentComponent : public UActorComponent
 {
@@ -39,6 +41,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "装备")
 	void GetTotalWuXingBonuses(int32& OutJin, int32& OutMu, int32& OutShui, int32& OutHuo, int32& OutTu) const;
+
+	UPROPERTY(BlueprintAssignable, Category = "装备")
+	FOnEquipmentChanged OnEquipmentChanged;
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "装备")

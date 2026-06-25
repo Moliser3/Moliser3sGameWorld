@@ -19,10 +19,11 @@ class MOLISER3SGAMECLIENT_API UConsumableItem : public UItemBase
 	GENERATED_BODY()
 
 public:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "消耗品")
+	UConsumableItem();
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "消耗品", meta = (DisplayName = "效果类型"))
 	EConsumableEffectType EffectType = EConsumableEffectType::HealHP;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "消耗品", meta = (ClampMin = "0.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "消耗品", meta = (DisplayName = "效果值", ClampMin = "0.0"))
 	float EffectValue = 50.0f;
 
 	virtual void Use_Implementation(AActor* User) override;

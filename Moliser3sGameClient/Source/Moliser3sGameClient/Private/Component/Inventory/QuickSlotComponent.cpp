@@ -18,6 +18,11 @@ bool UQuickSlotComponent::AssignSlot(int32 Index, UItemBase* Item, int32 Count)
 		UE_LOG(LogTemp, Warning, TEXT("[快捷栏] AssignSlot 失败: Index=%d 无效"), Index);
 		return false;
 	}
+	if (Item && Item->ItemCategory != EItemCategory::Consumable)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[快捷栏] AssignSlot 失败: %s 不是消耗品"), *Item->ItemID.ToString());
+		return false;
+	}
 	UE_LOG(LogTemp, Warning, TEXT("[快捷栏] AssignSlot: Slot[%d] <== %s x%d"), Index,
 		Item ? *Item->ItemID.ToString() : TEXT("null"), Count);
 	Slots[Index] = Item;
@@ -190,16 +195,16 @@ void UQuickSlotComponent::DropSlotItem(int32 Index)
 	UE_LOG(LogTemp, Warning, TEXT("[快捷栏] DropSlotItem: Slot[%d] 已清空"), Index);
 }
 
-void UQuickSlotComponent::SwapWithInventory(int32 InventorySlotIndex, int32 QuickSlotIndex, bool bFromInventory)
+bool UQuickSlotComponent::SwapWithInventory(int32 InventorySlotIndex, int32 QuickSlotIndex, bool bFromInventory)
 {
 	AActor* Owner = GetOwner();
-	if (!Owner) return;
+	if (!Owner) { return false; }
 
 	UInventoryComponent* Inv = Owner->FindComponentByClass<UInventoryComponent>();
 	if (!Inv)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("[快捷栏] SwapWithInventory ❌ 失败: 未找到 InventoryComponent"));
-		return;
+		return false;
 	}
 
 	UE_LOG(LogTemp, Warning, TEXT("[快捷栏] === SwapWithInventory 开始: %s → 背包[%d] <-> 快捷栏[%d] ==="),
@@ -216,6 +221,13 @@ void UQuickSlotComponent::SwapWithInventory(int32 InventorySlotIndex, int32 Quic
 		QuickSlotIndex,
 		ItemB ? TEXT("有") : TEXT("空"), ItemB ? *ItemB->ItemID.ToString() : TEXT(""), CountB);
 
+	// 检查放入快捷栏的物品是否为消耗品
+	if (ItemA && ItemA->ItemCategory != EItemCategory::Consumable)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[快捷栏] SwapWithInventory 失败: %s 不是消耗品"), *ItemA->ItemID.ToString());
+		return false;
+	}
+
 	Inv->BeginBatch();
 
 	// ── 同类物品叠加 ──
@@ -225,25 +237,22 @@ void UQuickSlotComponent::SwapWithInventory(int32 InventorySlotIndex, int32 Quic
 
 		if (bFromInventory)
 		{
-			// 背包→快捷栏：优先 背包→快捷栏
 			if (CountB < ItemB->MaxStackSize)
 			{
 				int32 Space = ItemB->MaxStackSize - CountB;
 				int32 MoveCount = FMath::Min(CountA, Space);
-				UE_LOG(LogTemp, Warning, TEXT("[快捷栏] SwapWithInventory: 方向 背包→快捷栏 空间=%d 可移=%d"), Space, MoveCount);
 				Inv->RemoveItem(InventorySlotIndex, MoveCount);
 				ItemCounts[QuickSlotIndex] += MoveCount;
 				UE_LOG(LogTemp, Warning, TEXT("[快捷栏] SwapWithInventory ✅: %s 从背包叠加 %d 个到快捷栏 (背包剩余=%d 快捷栏=%d)"),
 					*ItemB->ItemID.ToString(), MoveCount, Inv->GetCountAt(InventorySlotIndex), ItemCounts[QuickSlotIndex]);
 				OnQuickSlotChanged.Broadcast();
 				Inv->EndBatch();
-				return;
+				return true;
 			}
 			if (CountA < ItemA->MaxStackSize)
 			{
 				int32 Space = ItemA->MaxStackSize - CountA;
 				int32 MoveCount = FMath::Min(CountB, Space);
-				UE_LOG(LogTemp, Warning, TEXT("[快捷栏] SwapWithInventory: 次级 快捷栏→背包 空间=%d 可移=%d"), Space, MoveCount);
 				ItemCounts[QuickSlotIndex] -= MoveCount;
 				Inv->SetItemAt(InventorySlotIndex, ItemA, CountA + MoveCount);
 				if (ItemCounts[QuickSlotIndex] <= 0) { Slots[QuickSlotIndex] = nullptr; ItemCounts[QuickSlotIndex] = 0; }
@@ -251,17 +260,15 @@ void UQuickSlotComponent::SwapWithInventory(int32 InventorySlotIndex, int32 Quic
 					*ItemA->ItemID.ToString(), MoveCount, ItemCounts[QuickSlotIndex], CountA + MoveCount);
 				OnQuickSlotChanged.Broadcast();
 				Inv->EndBatch();
-				return;
+				return true;
 			}
 		}
 		else
 		{
-			// 快捷栏→背包：优先 快捷栏→背包
 			if (CountA < ItemA->MaxStackSize)
 			{
 				int32 Space = ItemA->MaxStackSize - CountA;
 				int32 MoveCount = FMath::Min(CountB, Space);
-				UE_LOG(LogTemp, Warning, TEXT("[快捷栏] SwapWithInventory: 方向 快捷栏→背包 空间=%d 可移=%d"), Space, MoveCount);
 				ItemCounts[QuickSlotIndex] -= MoveCount;
 				Inv->SetItemAt(InventorySlotIndex, ItemA, CountA + MoveCount);
 				if (ItemCounts[QuickSlotIndex] <= 0) { Slots[QuickSlotIndex] = nullptr; ItemCounts[QuickSlotIndex] = 0; }
@@ -269,24 +276,23 @@ void UQuickSlotComponent::SwapWithInventory(int32 InventorySlotIndex, int32 Quic
 					*ItemA->ItemID.ToString(), MoveCount, ItemCounts[QuickSlotIndex], CountA + MoveCount);
 				OnQuickSlotChanged.Broadcast();
 				Inv->EndBatch();
-				return;
+				return true;
 			}
 			if (CountB < ItemB->MaxStackSize)
 			{
 				int32 Space = ItemB->MaxStackSize - CountB;
 				int32 MoveCount = FMath::Min(CountA, Space);
-				UE_LOG(LogTemp, Warning, TEXT("[快捷栏] SwapWithInventory: 次级 背包→快捷栏 空间=%d 可移=%d"), Space, MoveCount);
 				Inv->RemoveItem(InventorySlotIndex, MoveCount);
 				ItemCounts[QuickSlotIndex] += MoveCount;
 				UE_LOG(LogTemp, Warning, TEXT("[快捷栏] SwapWithInventory ✅: %s 从背包叠加 %d 个到快捷栏 (背包剩余=%d 快捷栏=%d)"),
 					*ItemB->ItemID.ToString(), MoveCount, Inv->GetCountAt(InventorySlotIndex), ItemCounts[QuickSlotIndex]);
 				OnQuickSlotChanged.Broadcast();
 				Inv->EndBatch();
-				return;
+				return true;
 			}
 		}
 
-		UE_LOG(LogTemp, Warning, TEXT("[快捷栏] SwapWithInventory: 两格均已满 (背包=%d/%d 快捷栏=%d/%d)，退化为交换"),
+		UE_LOG(LogTemp, Warning, TEXT("[快捷栏] SwapWithInventory: 两格均已满，退化为交换"),
 			CountA, ItemA->MaxStackSize, CountB, ItemB->MaxStackSize);
 	}
 	else
@@ -294,7 +300,6 @@ void UQuickSlotComponent::SwapWithInventory(int32 InventorySlotIndex, int32 Quic
 		UE_LOG(LogTemp, Warning, TEXT("[快捷栏] SwapWithInventory: 不同物品或单边为空，执行交换"));
 	}
 
-	// ── 不同物品 或 同类已满 → 交换 ──
 	if (ItemA) Inv->RemoveItem(InventorySlotIndex, CountA);
 	if (ItemB) ClearSlot(QuickSlotIndex);
 	if (ItemA) AssignSlot(QuickSlotIndex, ItemA, CountA);
@@ -302,6 +307,7 @@ void UQuickSlotComponent::SwapWithInventory(int32 InventorySlotIndex, int32 Quic
 
 	Inv->EndBatch();
 	UE_LOG(LogTemp, Warning, TEXT("[快捷栏] === SwapWithInventory 完成 ==="));
+	return true;
 }
 
 UItemBase* UQuickSlotComponent::GetSlotItem(int32 Index) const

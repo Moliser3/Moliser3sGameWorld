@@ -15,6 +15,7 @@ enum class EEquipmentSlot : uint8
 	Belt      UMETA(DisplayName = "腰带"),
 	Pants     UMETA(DisplayName = "裤子"),
 	Boots     UMETA(DisplayName = "靴子"),
+	Cloak     UMETA(DisplayName = "披风"),
 	Amulet    UMETA(DisplayName = "项链"),
 	Ring1     UMETA(DisplayName = "戒指1"),
 	Ring2     UMETA(DisplayName = "戒指2"),
@@ -22,10 +23,11 @@ enum class EEquipmentSlot : uint8
 	OffHand   UMETA(DisplayName = "副手")
 };
 
-/** 武器使用类型 */
+/** 武器使用类型（仅武器类使用，防具饰品为None） */
 UENUM(BlueprintType)
 enum class EWeaponUsage : uint8
 {
+	None    UMETA(DisplayName = "无"),
 	OneHand UMETA(DisplayName = "单手"),
 	TwoHand UMETA(DisplayName = "双手")
 };
@@ -47,31 +49,31 @@ struct FEquipmentItemData
 	GENERATED_BODY()
 
 	/** 物品唯一标识 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "基础")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "基础", meta = (DisplayName = "物品ID"))
 	FName ItemID = NAME_None;
 
 	/** 显示名称 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "基础")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "基础", meta = (DisplayName = "名称"))
 	FText DisplayName;
 
 	/** 物品描述 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "基础")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "基础", meta = (DisplayName = "描述"))
 	FText Description;
 
 	/** 装备槽位 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "装备属性")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "装备属性", meta = (DisplayName = "装备槽位"))
 	EEquipmentSlot Slot = EEquipmentSlot::Helmet;
 
 	/** 稀有度 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "装备属性")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "装备属性", meta = (DisplayName = "稀有度"))
 	EItemRarity Rarity = EItemRarity::Normal;
 
 	/** 武器类型（非武器时无效） */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "装备属性")
-	EWeaponUsage WeaponUsage = EWeaponUsage::OneHand;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "装备属性", meta = (DisplayName = "武器类型"))
+	EWeaponUsage WeaponUsage = EWeaponUsage::None;
 
 	/** 等级需求 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "装备属性", meta = (ClampMin = "1"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "装备属性", meta = (DisplayName = "等级需求", ClampMin = "1"))
 	int32 RequiredLevel = 1;
 
 	/** 是否为双手武器（占用主手+锁定副手） */

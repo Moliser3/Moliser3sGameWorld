@@ -47,7 +47,7 @@ public:
 	void DropSlotItem(int32 Index);
 
 	UFUNCTION(BlueprintCallable, Category = "快捷栏")
-	void SwapWithInventory(int32 InventorySlotIndex, int32 QuickSlotIndex, bool bFromInventory);
+	bool SwapWithInventory(int32 InventorySlotIndex, int32 QuickSlotIndex, bool bFromInventory);
 
 	UFUNCTION(BlueprintPure, Category = "快捷栏")
 	TArray<UItemBase*> GetAllSlots() const;

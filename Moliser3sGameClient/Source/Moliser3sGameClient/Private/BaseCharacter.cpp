@@ -97,6 +97,7 @@ void ABaseCharacter::BeginPlay()
 	TryEquip(BeltItem,      EEquipmentSlot::Belt);
 	TryEquip(PantsItem,     EEquipmentSlot::Pants);
 	TryEquip(BootsItem,     EEquipmentSlot::Boots);
+	TryEquip(CloakItem,     EEquipmentSlot::Cloak);
 	TryEquip(AmuletItem,    EEquipmentSlot::Amulet);
 	TryEquip(Ring1Item,     EEquipmentSlot::Ring1);
 	TryEquip(Ring2Item,     EEquipmentSlot::Ring2);

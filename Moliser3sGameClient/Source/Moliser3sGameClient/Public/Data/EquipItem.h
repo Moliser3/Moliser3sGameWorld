@@ -16,15 +16,15 @@ class MOLISER3SGAMECLIENT_API UEquipItem : public UItemBase
 
 public:
 	/** 装备槽位 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "装备")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "装备", meta = (DisplayName = "装备槽位"))
 	EEquipmentSlot Slot = EEquipmentSlot::Helmet;
 
 	/** 武器类型（仅主手武器有效） */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "装备")
-	EWeaponUsage WeaponUsage = EWeaponUsage::OneHand;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "装备", meta = (DisplayName = "武器类型"))
+	EWeaponUsage WeaponUsage = EWeaponUsage::None;
 
 	/** 等级需求 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "装备", meta = (ClampMin = "1"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "装备", meta = (DisplayName = "等级需求", ClampMin = "1"))
 	int32 LevelRequirement = 1;
 
 	// ===== 五行加成 =====

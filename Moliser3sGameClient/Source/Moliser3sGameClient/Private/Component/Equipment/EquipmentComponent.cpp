@@ -12,6 +12,12 @@ bool UEquipmentComponent::EquipItem(UEquipItem* Item)
 {
 	if (!Item) return false;
 
+	if (Item->ItemCategory != EItemCategory::Equipment)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[装备] EquipItem 失败: %s 不是装备"), *Item->ItemID.ToString());
+		return false;
+	}
+
 	EEquipmentSlot TargetSlot = Item->Slot;
 
 	if (LockedSlots.Contains(TargetSlot))
@@ -39,6 +45,7 @@ bool UEquipmentComponent::EquipItem(UEquipItem* Item)
 	EquippedItems.Add(TargetSlot, Item);
 	ApplyItemBonuses(Item);
 
+	OnEquipmentChanged.Broadcast();
 	return true;
 }
 
@@ -54,6 +61,7 @@ bool UEquipmentComponent::UnequipItem(EEquipmentSlot Slot)
 
 	RemoveItemBonuses(Item);
 	EquippedItems.Remove(Slot);
+	OnEquipmentChanged.Broadcast();
 	return true;
 }
 
@@ -84,9 +92,9 @@ TArray<EEquipmentSlot> UEquipmentComponent::GetEmptySlots() const
 	TArray<EEquipmentSlot> AllSlots = {
 		EEquipmentSlot::Helmet,    EEquipmentSlot::Shoulders, EEquipmentSlot::Chest,
 		EEquipmentSlot::Bracers,   EEquipmentSlot::Gloves,    EEquipmentSlot::Belt,
-		EEquipmentSlot::Pants,     EEquipmentSlot::Boots,     EEquipmentSlot::Amulet,
-		EEquipmentSlot::Ring1,     EEquipmentSlot::Ring2,     EEquipmentSlot::MainHand,
-		EEquipmentSlot::OffHand
+		EEquipmentSlot::Pants,     EEquipmentSlot::Boots,     EEquipmentSlot::Cloak,
+		EEquipmentSlot::Amulet,    EEquipmentSlot::Ring1,     EEquipmentSlot::Ring2,
+		EEquipmentSlot::MainHand,  EEquipmentSlot::OffHand
 	};
 
 	TArray<EEquipmentSlot> Empty;
