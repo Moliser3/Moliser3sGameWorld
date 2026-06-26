@@ -17,6 +17,7 @@ enum class EEquipmentSlot : uint8
 	Boots     UMETA(DisplayName = "靴子"),
 	Cloak     UMETA(DisplayName = "披风"),
 	Amulet    UMETA(DisplayName = "项链"),
+	Ring      UMETA(DisplayName = "戒指"),
 	Ring1     UMETA(DisplayName = "戒指1"),
 	Ring2     UMETA(DisplayName = "戒指2"),
 	MainHand  UMETA(DisplayName = "主手武器"),

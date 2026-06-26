@@ -50,8 +50,6 @@ bool UInventoryComponent::AddItem(UItemBase* Item, int32 Count)
 				int32 Add = FMath::Min(Remaining, Space);
 				ItemCounts[i] += Add;
 				Remaining -= Add;
-				UE_LOG(LogTemp, Warning, TEXT("[背包] AddItem: %s 堆叠到 Slot[%d]，当前数量=%d"),
-					*Item->ItemID.ToString(), i, ItemCounts[i]);
 			}
 		}
 		if (Remaining <= 0)
@@ -82,7 +80,6 @@ bool UInventoryComponent::AddItem(UItemBase* Item, int32 Count)
 				ItemCounts[EmptySlot] = Add;
 			}
 			Remaining -= Add;
-			UE_LOG(LogTemp, Warning, TEXT("[背包] AddItem: %s x%d 放入 Slot[%d]"), *Item->ItemID.ToString(), Add, EmptySlot);
 		}
 
 		BroadcastChange();
@@ -107,7 +104,6 @@ bool UInventoryComponent::AddItem(UItemBase* Item, int32 Count)
 		ItemCounts[EmptySlot] = Count;
 	}
 
-	UE_LOG(LogTemp, Warning, TEXT("[背包] AddItem: %s x%d 放入 Slot[%d]"), *Item->ItemID.ToString(), Count, EmptySlot);
 	BroadcastChange();
 	return true;
 }
@@ -126,10 +122,6 @@ bool UInventoryComponent::RemoveItem(int32 SlotIndex, int32 Count)
 	}
 
 	int32 RemoveCount = FMath::Min(Count, ItemCounts[SlotIndex]);
-
-	UE_LOG(LogTemp, Warning, TEXT("[背包] RemoveItem: Slot[%d] %s 移除 %d 个 (剩余 %d)"), SlotIndex,
-		*Items[SlotIndex]->ItemID.ToString(), RemoveCount, ItemCounts[SlotIndex] - RemoveCount);
-
 	ItemCounts[SlotIndex] -= RemoveCount;
 	if (ItemCounts[SlotIndex] <= 0)
 	{
@@ -192,9 +184,6 @@ bool UInventoryComponent::IsFull() const
 
 void UInventoryComponent::DropItem(int32 SlotIndex, int32 Count)
 {
-	UE_LOG(LogTemp, Warning, TEXT("[背包] DropItem 收到参数: Count=%d ItemCounts[%d]=%d"),
-		Count, SlotIndex, ItemCounts.IsValidIndex(SlotIndex) ? ItemCounts[SlotIndex] : 0);
-
 	if (!Items.IsValidIndex(SlotIndex))
 	{
 		UE_LOG(LogTemp, Warning, TEXT("[背包] DropItem 失败: SlotIndex=%d 无效"), SlotIndex);
@@ -211,13 +200,8 @@ void UInventoryComponent::DropItem(int32 SlotIndex, int32 Count)
 
 	int32 DropCount = FMath::Min(Count, ItemCounts[SlotIndex]);
 
-	UE_LOG(LogTemp, Warning, TEXT("[背包] DropItem: Slot[%d] %s x%d 丢弃到场景"), SlotIndex,
-		*Items[SlotIndex]->ItemID.ToString(), DropCount);
-
 	FVector DropLocation = Owner->GetActorLocation() + Owner->GetActorForwardVector() * 100.0f;
-	AWorldItemActor* WorldItem = SpawnWorldItem(DropLocation, Items[SlotIndex].Get());
-	if (WorldItem)
-		UE_LOG(LogTemp, Warning, TEXT("[背包] DropItem: WorldItemActor 已生成"));
+	SpawnWorldItem(DropLocation, Items[SlotIndex].Get());
 
 	ItemCounts[SlotIndex] -= DropCount;
 	if (ItemCounts[SlotIndex] <= 0)
@@ -230,10 +214,6 @@ void UInventoryComponent::DropItem(int32 SlotIndex, int32 Count)
 
 void UInventoryComponent::SwapItems(int32 IndexA, int32 IndexB)
 {
-	UE_LOG(LogTemp, Warning, TEXT("[背包] SwapItems: Slot[%d]=%s(x%d) <-> Slot[%d]=%s(x%d)"),
-		IndexA, Items[IndexA] ? *Items[IndexA]->ItemID.ToString() : TEXT("空"), ItemCounts.IsValidIndex(IndexA) ? ItemCounts[IndexA] : 0,
-		IndexB, Items[IndexB] ? *Items[IndexB]->ItemID.ToString() : TEXT("空"), ItemCounts.IsValidIndex(IndexB) ? ItemCounts[IndexB] : 0);
-
 	if (!Items.IsValidIndex(IndexA))
 	{
 		UE_LOG(LogTemp, Warning, TEXT("[背包] SwapItems 失败: IndexA=%d 无效"), IndexA);
@@ -259,7 +239,6 @@ void UInventoryComponent::SwapItems(int32 IndexA, int32 IndexB)
 	ItemCounts[IndexB] = TempCount;
 
 	BroadcastChange();
-	UE_LOG(LogTemp, Warning, TEXT("[背包] SwapItems 完成"));
 }
 
 bool UInventoryComponent::TryStackOrSwap(int32 SourceSlot, int32 TargetSlot)
@@ -306,8 +285,6 @@ bool UInventoryComponent::TryStackOrSwap(int32 SourceSlot, int32 TargetSlot)
 			ItemCounts[SourceSlot] = 0;
 		}
 
-		UE_LOG(LogTemp, Warning, TEXT("[背包] TryStackOrSwap: %s 从 Slot[%d] 叠加 %d 个到 Slot[%d] (目标=%d 源剩余=%d)"),
-			*SrcItem->ItemID.ToString(), SourceSlot, MoveCount, TargetSlot, ItemCounts[TargetSlot], ItemCounts[SourceSlot]);
 		BroadcastChange();
 		return true;
 	}
@@ -332,9 +309,6 @@ void UInventoryComponent::UseItem(int32 SlotIndex)
 	AActor* Owner = GetOwner();
 	if (!Owner) return;
 
-	UE_LOG(LogTemp, Warning, TEXT("[背包] UseItem: Slot[%d] 使用 %s x%d"), SlotIndex,
-		*Items[SlotIndex]->ItemID.ToString(), ItemCounts[SlotIndex]);
-
 	Items[SlotIndex]->Use(Owner);
 
 	ItemCounts[SlotIndex]--;
@@ -348,39 +322,30 @@ void UInventoryComponent::UseItem(int32 SlotIndex)
 
 bool UInventoryComponent::SplitItem(int32 SourceSlotIndex, int32 SplitCount)
 {
-	UE_LOG(LogTemp, Warning, TEXT("[背包] === SplitItem 开始: SourceSlot=%d SplitCount=%d ==="), SourceSlotIndex, SplitCount);
-	UE_LOG(LogTemp, Warning, TEXT("[背包] SplitItem: Items.Num=%d MaxSlots=%d"), Items.Num(), MaxSlots);
-
 	if (!Items.IsValidIndex(SourceSlotIndex))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[背包] SplitItem ❌ 失败: SourceSlotIndex=%d 无效"), SourceSlotIndex);
+		UE_LOG(LogTemp, Warning, TEXT("[背包] SplitItem 失败: SourceSlotIndex=%d 无效"), SourceSlotIndex);
 		return false;
 	}
 	if (!Items[SourceSlotIndex])
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[背包] SplitItem ❌ 失败: SourceSlot[%d] 为空"), SourceSlotIndex);
+		UE_LOG(LogTemp, Warning, TEXT("[背包] SplitItem 失败: SourceSlot[%d] 为空"), SourceSlotIndex);
 		return false;
 	}
-
-	UE_LOG(LogTemp, Warning, TEXT("[背包] SplitItem: 源物品=%s Count=%d MaxStack=%d"),
-		*Items[SourceSlotIndex]->ItemID.ToString(), ItemCounts[SourceSlotIndex], Items[SourceSlotIndex]->MaxStackSize);
-
 	if (SplitCount <= 0 || SplitCount >= ItemCounts[SourceSlotIndex])
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[背包] SplitItem ❌ 失败: 拆分数量 %d 不合法 (当前=%d)"), SplitCount, ItemCounts[SourceSlotIndex]);
+		UE_LOG(LogTemp, Warning, TEXT("[背包] SplitItem 失败: 拆分数量 %d 不合法 (当前=%d)"), SplitCount, ItemCounts[SourceSlotIndex]);
 		return false;
 	}
 
 	UItemBase* SourceItem = Items[SourceSlotIndex].Get();
 
-	UE_LOG(LogTemp, Warning, TEXT("[背包] SplitItem: 查找空格..."));
 	int32 TargetSlot = FindEmptySlot();
 	if (TargetSlot == INDEX_NONE)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[背包] SplitItem ❌ 失败: 无可用空格"));
+		UE_LOG(LogTemp, Warning, TEXT("[背包] SplitItem 失败: 无可用空格"));
 		return false;
 	}
-	UE_LOG(LogTemp, Warning, TEXT("[背包] SplitItem: 找到空格 Slot[%d]"), TargetSlot);
 
 	if (TargetSlot == Items.Num())
 	{
@@ -396,19 +361,13 @@ bool UInventoryComponent::SplitItem(int32 SourceSlotIndex, int32 SplitCount)
 	ItemCounts[SourceSlotIndex] -= SplitCount;
 	ItemCounts[TargetSlot] += SplitCount;
 
-	UE_LOG(LogTemp, Warning, TEXT("[背包] SplitItem ✅: %s 从 Slot[%d] 拆分 %d 个到 Slot[%d] (源剩余=%d 目标=%d)"),
-		*SourceItem->ItemID.ToString(), SourceSlotIndex, SplitCount, TargetSlot,
-		ItemCounts[SourceSlotIndex], ItemCounts[TargetSlot]);
-
 	if (ItemCounts[SourceSlotIndex] <= 0)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[背包] SplitItem: 源格已空，清空 Slot[%d]"), SourceSlotIndex);
 		Items[SourceSlotIndex] = nullptr;
 		ItemCounts[SourceSlotIndex] = 0;
 	}
 
 	BroadcastChange();
-	UE_LOG(LogTemp, Warning, TEXT("[背包] === SplitItem 完成 ==="));
 	return true;
 }
 

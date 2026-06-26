@@ -85,7 +85,7 @@ void ABaseCharacter::BeginPlay()
 		if (Item)
 		{
 			Item->Slot = Slot;
-			GetEquipmentComponent()->EquipItem(Item);
+			GetEquipmentComponent()->EquipItem(Item, Slot);
 		}
 	};
 

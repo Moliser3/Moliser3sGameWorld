@@ -606,3 +606,10 @@ WBP_QuickSlot.OnDragDetected
 | 06/24 | **[新增] OnEquipmentChanged事件** + SwapWithInventory改为bool返回 + NotifyInventoryChanged | EquipmentComponent, QuickSlotComponent, InventoryComponent |
 | 06/24 | **[新增] 披风槽位 Cloak**：EEquipmentSlot 13→14 | EquipmentData.h, BaseCharacter.h/.cpp, EquipmentComponent.cpp |
 | 06/24 | **[修改] EWeaponUsage新增None**：防具饰品默认值 | EquipmentData.h |
+| 06/25 | **[新增] HandleSlotDrop统一路由**：三容器拖拽逻辑集中，蓝图每个Slot的OnDrop一行调用 | DragDropHandler.h/.cpp |
+| 06/25 | **[新增] UnequipToInventorySlot**：装备拖回背包时支持交换/放入/拒绝三种行为 | EquipmentComponent.h/.cpp |
+| 06/25 | **[新增] MoveEquippedItem**：装备槽间互换（不进背包） | EquipmentComponent.h/.cpp |
+| 06/25 | **[新增] EquipItem(TargetSlotOverride)**：戒指互通 + 目标槽参数 | EquipmentComponent.h/.cpp |
+| 06/25 | **[新增] HandleDragCancelled**：统一取消拖拽逻辑，鼠标在UI上回弹刷新，在场景上丢弃 | DragDropHandler.h/.cpp |
+| 06/25 | **[新增] AddItemToInventory**：根据分类自动加载DataTable → 创建物品 → 加入背包 | ItemFactory.h/.cpp |
+| 06/25 | **[清理] 过量Debug日志**：移除背包/快捷栏/Controller信息性日志 | InventoryComponent, QuickSlotComponent, WorldPlayerController |

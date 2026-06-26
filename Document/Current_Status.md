@@ -1,6 +1,6 @@
 # 当前工作状态
 
-> 最后更新：2026/06/24 23:00
+> 最后更新：2026/06/25 02:30
 
 ## 当前阶段
 第一阶段（基础完善）**全部完成** ✅
@@ -184,18 +184,44 @@
 - **`EEquipmentSlot` 新增 `Cloak`**：槽位 13 → 14
 - **`BaseCharacter` 新增 `CloakItem` Debug 属性**：与现有装备测试模式一致
 
+## 已完成工作（06/25）
+
+### 六十五、背包↔装备栏完整拖拽交互
+- **`HandleSlotDrop` 统一路由函数**：Inventory/QuickSlot/EquipSlot 三容器拖拽逻辑集中到 C++，蓝图每个 Slot 的 OnDrop 只需一行调用
+- **`UnequipToInventorySlot(EquipSlot, InvIdx)`**：装备拖回背包时支持三种行为：
+  - 目标格空 → 直接放入
+  - 目标格有同部位装备 → 互换
+  - 目标格有不同类物品 → 拒绝（装备留在原位）
+- **`CanEquipItemAtSlot` 戒指互通**：物品 `Slot=Ring` 可装备到 Ring1/Ring2 任一槽位
+- **`EquipSlot→EquipSlot` 互换**：`MoveEquippedItem(From, To)` 直接在 TMap 中交换两槽位物品，不进背包
+- **`EquipItem(Item, TargetSlotOverride)`**：新增目标槽参数，支持戒指互放
+- **`EquipSlot→QuickSlot` 拒绝时刷新**：装备栏 UI 恢复 Icon
+- 涉及文件：`EquipmentComponent.h/.cpp`, `DragDropHandler.h/.cpp`
+
+### 六十六、HandleDragCancelled 统一取消拖拽逻辑
+- **`HandleDragCancelled`**：检测鼠标下是否有任意 UMG，有则刷新来源容器后回弹，无则执行丢弃
+- 三个 Slot 的 OnDragCancelled 蓝图统一为 1 个函数调用，无需维护 Panel 范围检测
+- 涉及文件：`DragDropHandler.h/.cpp`
+
+### 六十七、添加物品到背包统一接口
+- **`ItemFactory::AddItemToInventory(RowID, Category, Count)`**：根据分类自动加载对应 DataTable → 创建物品 → 加入背包
+- 蓝图中一行调用即可从数据表创建物品并放入背包
+- 涉及文件：`ItemFactory.h/.cpp`
+
+### 六十八、过量 Debug 日志清理
+- 移除 `InventoryComponent`、`QuickSlotComponent`、`WorldPlayerController` 中信息性日志
+- 保留错误/警告日志和装备拖拽 `[装备拖拽]` 调试日志
+
 ## 🎯 下一步待办
 
-### 背包武器↔角色面板武器槽交互（下阶段核心）
-- 从背包拖拽武器到角色面板武器槽位 → `EquipmentComponent.EquipItem(Item)`
-- 从角色面板拖拽卸下武器 → `UnequipItem(Slot)` + 返回背包
-- 面板 14 个槽位 + 属性全量刷新
+### P3 系统完善
+- 地面物品拾取交互（点击/靠近触发 `OnPickup`）
+- 右键菜单条件显示（使用/装备/拆分按钮可见性）
+- 商店系统
 
-### UMG 蓝图（纯蓝图，随交互逐步完善）
-- `WBP_QuickSlot`：快捷栏格子拖拽逻辑
+### UMG 蓝图收尾
 - `WBP_ItemContextMenu`：右键菜单条件显示
-- `WBP_CharacterPanel`：角色面板布局
-- Panel 事件绑定刷新
+- `WBP_CharacterPanel`：角色面板属性刷新
 
 ## 已完成工作（06/21）
 

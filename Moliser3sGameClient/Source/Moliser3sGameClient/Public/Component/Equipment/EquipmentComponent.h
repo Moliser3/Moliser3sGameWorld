@@ -7,6 +7,7 @@
 
 class UEquipItem;
 class UAttributeComponent;
+class UInventoryComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnEquipmentChanged);
 
@@ -19,10 +20,22 @@ public:
 	UEquipmentComponent();
 
 	UFUNCTION(BlueprintCallable, Category = "装备")
-	bool EquipItem(UEquipItem* Item);
+	bool EquipItem(UEquipItem* Item, EEquipmentSlot TargetSlotOverride);
 
 	UFUNCTION(BlueprintCallable, Category = "装备")
 	bool UnequipItem(EEquipmentSlot Slot);
+
+	UFUNCTION(BlueprintCallable, Category = "装备")
+	bool UnequipToInventory(EEquipmentSlot Slot);
+
+	UFUNCTION(BlueprintCallable, Category = "装备")
+	bool UnequipToInventorySlot(EEquipmentSlot EquipSlot, int32 InventorySlotIndex);
+
+	UFUNCTION(BlueprintCallable, Category = "装备")
+	void DropEquippedItem(EEquipmentSlot Slot);
+
+	UFUNCTION(BlueprintPure, Category = "装备")
+	static bool CanEquipItemAtSlot(UEquipItem* Item, EEquipmentSlot TargetSlot);
 
 	UFUNCTION(BlueprintPure, Category = "装备")
 	UEquipItem* GetEquippedItem(EEquipmentSlot Slot) const;
@@ -42,8 +55,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "装备")
 	void GetTotalWuXingBonuses(int32& OutJin, int32& OutMu, int32& OutShui, int32& OutHuo, int32& OutTu) const;
 
+	void MoveEquippedItem(EEquipmentSlot From, EEquipmentSlot To);
+
 	UPROPERTY(BlueprintAssignable, Category = "装备")
 	FOnEquipmentChanged OnEquipmentChanged;
+
+	EEquipmentSlot FindEquippedSlot(UEquipItem* Item) const;
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "装备")

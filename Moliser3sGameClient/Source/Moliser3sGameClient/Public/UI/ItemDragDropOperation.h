@@ -10,7 +10,8 @@ UENUM(BlueprintType)
 enum class ESlotContainerType : uint8
 {
 	Inventory UMETA(DisplayName = "背包"),
-	QuickSlot UMETA(DisplayName = "快捷栏")
+	QuickSlot UMETA(DisplayName = "快捷栏"),
+	EquipSlot UMETA(DisplayName = "装备槽")
 };
 
 UCLASS(BlueprintType)

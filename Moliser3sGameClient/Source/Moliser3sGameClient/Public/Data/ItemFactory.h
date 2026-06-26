@@ -25,4 +25,7 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "物品", meta = (WorldContext = "WorldContextObject"))
 	static UItemBase* CreateQuestItem(const UObject* WorldContextObject, UDataTable* DataTable, FName RowID);
+
+	UFUNCTION(BlueprintCallable, Category = "物品", meta = (WorldContext = "WorldContextObject"))
+	static bool AddItemToInventory(const UObject* WorldContextObject, FName RowID, EItemCategory Category, int32 Count = 1);
 };
