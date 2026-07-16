@@ -1,6 +1,6 @@
 # 当前工作状态
 
-> 最后更新：2026/06/25 02:30
+> 最后更新：2026/07/16 15:00
 
 ## 当前阶段
 第一阶段（基础完善）**全部完成** ✅
@@ -8,7 +8,27 @@
 第三阶段（正交状态机重构）—— 双轴状态 + 事件驱动已完成 ✅
 **第四阶段（数据先行 — P2）基本完成** ✅  
 **第五阶段（背包系统 — P3）搭建中 🚧**  
-**第六阶段（快捷栏系统 — 终极）搭建中 🚧**
+**第六阶段（快捷栏系统 — 终极）搭建中 🚧**  
+**第七阶段（路径表现组件）已完成** ✅
+
+## 已完成工作（07/16）
+
+### 六十九、路径表现组件（UPathDisplayComponent）
+- **新增 `Component/PathDisplay/PathDisplayComponent.h/.cpp`**：
+  - Catmull-Rom 样条插值生成平滑路径，而非直线连接
+  - `StepLength`：步长控制采样间隔
+  - `StepSubdivision`：步长边细分数量，使拐弯处 Perp 过渡平滑
+  - `PathWidth`：路径宽度
+  - `EndMarkerSize`：终点标记大小（独立 Section 1）
+  - 连续 UV 映射：V = 累计路径距离 / StepLength，不归零
+  - 交替三角形绕序：相邻 quad 交替对角线方向，消除固定折痕
+  - 法线固定为 `(0,0,1)`，全部 CCW 绕序
+  - 终点标记有独立材质 `EndMarkerMaterial`
+- **公开接口**：
+  - `SetNewPathMesh(PathNodes, StepLength, PathWidth, EndMarkerSize)` — 主入口，清空旧 Section 0/1 后重建
+  - `SetEndMarkerMaterial` — 设置终点标记材质
+  - `SetStepLength` / `SetPathWidth` / `SetStepSubdivision` / `SetEndMarkerSize` — 单独修改
+- **迁移至 DVD 项目**：复制到 `D:\UEProject\DVD\Source\Skull`，适配 API 宏 `SKULL_API`
 
 ## 已完成工作（06/22）
 

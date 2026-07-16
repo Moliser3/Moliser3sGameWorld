@@ -29,7 +29,8 @@ Moliser3sGameClient/Source/
 │   │   ├── InventoryComponent.h/.cpp        # 背包组件（30格+堆叠+事件，纯数据组件，无Tick）
 │   │   └── QuickSlotComponent.h/.cpp        # 快捷栏组件（10格+数字键+交换+使用即消）
 │   ├── Camera/CameraControllerComponent.h/.cpp # 摄像机控制
-│   └── Skill/SkillSystemComponent.h/.cpp     # 技能系统组件
+│   ├── PathDisplay/PathDisplayComponent.h/.cpp # 路径表现组件
+│   └── Skill/SkillSystemComponent.h/.cpp       # 技能系统组件
 ├── Skill/
 │   ├── SkillTypes.h                         # 类型定义 (ESkillCategory / ESkillType / FSkillStage)
 │   ├── SkillBase.h/.cpp                     # 技能基类 (多阶段)
@@ -108,6 +109,7 @@ Build.bat Moliser3sGameClientEditor Win64 Development -Project="项目路径\Mol
 | `UFacingComponent` | 玩家 | Walking/Aiming 两种朝向模式 |
 | `UClickDetectionComponent` | Controller | 屏幕鼠标射线检测 |
 | `USkillSystemComponent` | 玩家 | 双技能组管理 + 四阶段状态机 |
+| `UPathDisplayComponent` | 任何 Actor | 路径表现（Catmull-Rom 样条平滑路径 + 细分 + UV连续 + 终点标记） |
 | `UCameraControllerComponent` | Controller | 双轴独立弹性相机跟随 |
 
 ---
@@ -613,3 +615,5 @@ WBP_QuickSlot.OnDragDetected
 | 06/25 | **[新增] HandleDragCancelled**：统一取消拖拽逻辑，鼠标在UI上回弹刷新，在场景上丢弃 | DragDropHandler.h/.cpp |
 | 06/25 | **[新增] AddItemToInventory**：根据分类自动加载DataTable → 创建物品 → 加入背包 | ItemFactory.h/.cpp |
 | 06/25 | **[清理] 过量Debug日志**：移除背包/快捷栏/Controller信息性日志 | InventoryComponent, QuickSlotComponent, WorldPlayerController |
+| 07/16 | **[新增] UPathDisplayComponent**：路径表现组件，Catmull-Rom 样条平滑路径 + StepSubdivision 细分 + 连续 UV 映射 + 交替三角形绕序 + 终点标记 | Component/PathDisplay/* |
+| 07/16 | **[新增] ProceduralMeshComponent**：启用插件 + 模块依赖 | .uproject, Build.cs |
