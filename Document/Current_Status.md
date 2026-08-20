@@ -1,6 +1,6 @@
 # 当前工作状态
 
-> 最后更新：2026/07/16 15:00
+> 最后更新：2026/08/20
 
 ## 当前阶段
 第一阶段（基础完善）**全部完成** ✅
@@ -10,6 +10,31 @@
 **第五阶段（背包系统 — P3）搭建中 🚧**  
 **第六阶段（快捷栏系统 — 终极）搭建中 🚧**  
 **第七阶段（路径表现组件）已完成** ✅
+**第八阶段（自研网格寻路系统 — 原型）进行中 🚧**
+
+## 已完成工作（08/20）
+
+### 七十、废弃五行概念，重构为五维直接属性
+- **背景**：摒弃世界观中的"五行"（金木水火土）根基概念
+- **删除枚举**：`DataDefinitions.h` 的 `EWuXing`、`SkillTypes.h` 的 `ESkillWuXing`
+- **`CharacterData.h` 重构**：五行根基值（Jin/Mu/Shui/Huo/Tu）→ 五维直接可配置字段（float 劲力/气血/内息/身法/体魄），删除相生 30% 交叉和 `GetDominantWuXing()`
+- **伤害计算**：`DamageCalculatorComponent` 删除五行相克系统（`GetWuXingMultiplier`、`WuXingMultiplier`），链路简化为 基础→暴击→外伤/内伤拆分→防御减免
+- **装备**：`EquipItem.h` / `ItemDataTable.h` 的 `JinBonus~TuBonus`(int) → 五维加成 `JinLiBonus~TiPoBonus`(float)，`EquipmentComponent` 直接加减五维
+- **日志**：`BaseCharacter.cpp` / `MeleeSlashSkill.cpp` 改为打印五维
+- **涉及文件**：CharacterData.h, DataDefinitions.h, SkillTypes.h, DamageCalculatorComponent.*, EquipItem.h, ItemDataTable.h, EquipmentComponent.*, ItemFactory.cpp, MeleeSlashSkill.cpp, BaseCharacter.cpp
+- **文档**：Development_Plan / Current_Status / Technical_Document 同步更新
+
+### 七十一、自研网格寻路系统（原型阶段 1）
+- **目标**：为大量敌人（几百上千）实现类暗黑2的手搓网格寻路，替代 UE5 NavMesh
+- **`Grid/GridMapData.h/.cpp`**：`UGridMapData` 数据资产，Width/Height/**CellSize（可编辑，默认 25cm）**/Origin，世界坐标↔网格坐标换算，地形类型（平地/斜坡/墙/水面），高度规则（差0可走、差1需斜坡、差>1悬崖不可走）
+- **`Grid/GridPathfinding.h/.cpp`**：手写 A* 寻路（4/8 方向、手写二叉堆 open set、含拐角穿插检测、移动代价）
+- **`Grid/GridMovementComponent.h/.cpp`**：沿网格路径逐格移动组件（挂角色用）
+- **`WorldActors/GridTestActor.h/.cpp`**：测试 Actor，程序化生成测试网格（带缺口墙/悬崖/斜坡/水面），控制场景中指定的 `TargetActor`（StaticMesh Actor）沿路径移动
+- **测试结果**：
+  - A* 寻路正确（(18,12)→(18,14) 成功；不可走终点正确返回失败）
+  - 测试关卡 `Lv_NavTest` + `BP_Grids`（Content/CoreSystem/Nav/）已建
+- **移动控制方式**：暴露 `TargetActor` 属性，直接控制外部 Actor 位置移动（`SetActorLocation`）
+- **说明**：CellSize 设计为可编辑值（当前原型用 25cm），后续支持多张地图
 
 ## 已完成工作（07/16）
 
