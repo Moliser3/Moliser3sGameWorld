@@ -18,17 +18,6 @@ enum class ESkillType : uint8
 	None UMETA(DisplayName = "无")
 };
 
-/** 技能五行属性 */
-UENUM(BlueprintType)
-enum class ESkillWuXing : uint8
-{
-	Jin   UMETA(DisplayName = "金"),
-	Mu    UMETA(DisplayName = "木"),
-	Shui  UMETA(DisplayName = "水"),
-	Huo   UMETA(DisplayName = "火"),
-	Tu    UMETA(DisplayName = "土")
-};
-
 class UAnimMontage;
 
 USTRUCT(BlueprintType)
@@ -62,10 +51,6 @@ struct FSkillStage
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.0", DisplayName = "技能范围"))
 	float SkillRange = 50.0f;
-
-	/** 该阶段的五行属性 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "阶段五行"))
-	ESkillWuXing SkillWuXing = ESkillWuXing::Jin;
 
 	/** 该阶段的外伤占比（0~1），剩余为内伤 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "外伤占比", ClampMin = "0.0", ClampMax = "1.0"))

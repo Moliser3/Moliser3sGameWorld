@@ -40,11 +40,11 @@ UEquipItem* UItemFactory::CreateEquipment(const UObject* WorldContextObject, UDa
 	Item->Slot = Row->EquipSlot;
 	Item->WeaponUsage = Row->WeaponUsage;
 	Item->LevelRequirement = Row->LevelRequirement;
-	Item->JinBonus = Row->JinBonus;
-	Item->MuBonus = Row->MuBonus;
-	Item->ShuiBonus = Row->ShuiBonus;
-	Item->HuoBonus = Row->HuoBonus;
-	Item->TuBonus = Row->TuBonus;
+	Item->JinLiBonus = Row->JinLiBonus;
+	Item->QiXueBonus = Row->QiXueBonus;
+	Item->NeiXiBonus = Row->NeiXiBonus;
+	Item->ShenFaBonus = Row->ShenFaBonus;
+	Item->TiPoBonus = Row->TiPoBonus;
 	return Item;
 }
 

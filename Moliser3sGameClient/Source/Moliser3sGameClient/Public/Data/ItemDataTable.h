@@ -39,20 +39,20 @@ struct FEquipmentDataRow : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "装备", meta = (DisplayName = "稀有度"))
 	EItemRarity Rarity = EItemRarity::Normal;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "装备|五行加成", meta = (DisplayName = "金加成"))
-	int32 JinBonus = 0;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "装备|五维加成", meta = (DisplayName = "劲力加成"))
+	float JinLiBonus = 0.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "装备|五行加成", meta = (DisplayName = "木加成"))
-	int32 MuBonus = 0;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "装备|五维加成", meta = (DisplayName = "气血加成"))
+	float QiXueBonus = 0.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "装备|五行加成", meta = (DisplayName = "水加成"))
-	int32 ShuiBonus = 0;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "装备|五维加成", meta = (DisplayName = "内息加成"))
+	float NeiXiBonus = 0.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "装备|五行加成", meta = (DisplayName = "火加成"))
-	int32 HuoBonus = 0;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "装备|五维加成", meta = (DisplayName = "身法加成"))
+	float ShenFaBonus = 0.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "装备|五行加成", meta = (DisplayName = "土加成"))
-	int32 TuBonus = 0;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "装备|五维加成", meta = (DisplayName = "体魄加成"))
+	float TiPoBonus = 0.0f;
 };
 
 USTRUCT(BlueprintType)

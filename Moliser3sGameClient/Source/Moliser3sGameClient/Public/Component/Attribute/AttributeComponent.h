@@ -11,7 +11,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnManaChangedDelegate, float, OldM
 
 /**
  * 角色属性组件
- * 管理五行根基值、运行时血量/法力、战斗属性
+ * 管理五维属性、运行时血量/法力、战斗属性
  */
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class MOLISER3SGAMECLIENT_API UAttributeComponent : public UActorComponent
@@ -23,7 +23,7 @@ public:
 
 	virtual void BeginPlay() override;
 
-	// ===== 角色核心数据（五行 → 五维 → 派生属性） =====
+	// ===== 角色核心数据（五维 → 派生属性） =====
 	UFUNCTION(BlueprintPure, Category = "Attributes")
 	const FCharacterCoreData& GetCharacterData() const { return CharacterData; }
 
@@ -62,7 +62,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Attributes")
 	void RestoreMana(float Amount);
 
-	// ===== 攻击属性（由五行派生） =====
+	// ===== 攻击属性（由五维派生） =====
 	UFUNCTION(BlueprintPure, Category = "Combat")
 	float GetBaseDamage() const { return CharacterData.GetAttackPower(); }
 
@@ -72,7 +72,7 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Combat")
 	float GetCritMultiplier() const { return CharacterData.CritMultiplier; }
 
-	// ===== 防御属性（由五行派生） =====
+	// ===== 防御属性（由五维派生） =====
 	UFUNCTION(BlueprintPure, Category = "Combat")
 	float GetExternalDefense() const { return CharacterData.GetExternalDefense(); }
 
@@ -83,35 +83,35 @@ public:
 	float GetDamageReduction() const { return CharacterData.DamageReduction; }
 
 	// ===== 五维属性 =====
-	UFUNCTION(BlueprintPure, Category = "WuXing")
+	UFUNCTION(BlueprintPure, Category = "Attributes")
 	float GetJinLi() const { return CharacterData.GetJinLi(); }
 
-	UFUNCTION(BlueprintPure, Category = "WuXing")
+	UFUNCTION(BlueprintPure, Category = "Attributes")
 	float GetQiXue() const { return CharacterData.GetQiXue(); }
 
-	UFUNCTION(BlueprintPure, Category = "WuXing")
+	UFUNCTION(BlueprintPure, Category = "Attributes")
 	float GetNeiXi() const { return CharacterData.GetNeiXi(); }
 
-	UFUNCTION(BlueprintPure, Category = "WuXing")
+	UFUNCTION(BlueprintPure, Category = "Attributes")
 	float GetShenFa() const { return CharacterData.GetShenFa(); }
 
-	UFUNCTION(BlueprintPure, Category = "WuXing")
+	UFUNCTION(BlueprintPure, Category = "Attributes")
 	float GetTiPo() const { return CharacterData.GetTiPo(); }
 
-	// ===== 五行派生便捷接口 =====
-	UFUNCTION(BlueprintPure, Category = "WuXing")
+	// ===== 五维派生便捷接口 =====
+	UFUNCTION(BlueprintPure, Category = "Attributes")
 	float GetAttackPower() const { return CharacterData.GetAttackPower(); }
 
-	UFUNCTION(BlueprintPure, Category = "WuXing")
+	UFUNCTION(BlueprintPure, Category = "Attributes")
 	float GetHealthRegen() const { return CharacterData.GetHealthRegen(); }
 
-	UFUNCTION(BlueprintPure, Category = "WuXing")
+	UFUNCTION(BlueprintPure, Category = "Attributes")
 	float GetManaRegen() const { return CharacterData.GetManaRegen(); }
 
-	UFUNCTION(BlueprintPure, Category = "WuXing")
+	UFUNCTION(BlueprintPure, Category = "Attributes")
 	float GetSpeedBonusPct() const { return CharacterData.GetSpeedBonusPct(); }
 
-	UFUNCTION(BlueprintPure, Category = "WuXing")
+	UFUNCTION(BlueprintPure, Category = "Attributes")
 	float GetDodgeRatePct() const { return CharacterData.GetDodgeRatePct(); }
 
 	/** 恢复满血量 */
@@ -136,8 +136,8 @@ public:
 	FOnManaChangedDelegate OnManaChanged;
 
 protected:
-	// ===== 五行核心数据 =====
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "五行核心数据")
+	// ===== 五维核心数据 =====
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "五维核心数据")
 	FCharacterCoreData CharacterData;
 
 	// ===== 运行时状态 =====

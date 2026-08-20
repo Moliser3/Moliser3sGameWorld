@@ -64,9 +64,7 @@ void ABaseCharacter::BeginPlay()
 		UE_LOG(LogTemp, Warning, TEXT("======================================"));
 		UE_LOG(LogTemp, Warning, TEXT("  [%s] Base Attributes"), *ActorName);
 		UE_LOG(LogTemp, Warning, TEXT("======================================"));
-		UE_LOG(LogTemp, Warning, TEXT("  Five: Jin=%d Mu=%d Shui=%d Huo=%d Tu=%d"),
-			Data.Jin, Data.Mu, Data.Shui, Data.Huo, Data.Tu);
-		UE_LOG(LogTemp, Warning, TEXT("  JinLi=%.1f QiXue=%.1f NeiXi=%.1f ShenFa=%.1f TiPo=%.1f"),
+		UE_LOG(LogTemp, Warning, TEXT("  Five: JinLi=%.1f QiXue=%.1f NeiXi=%.1f ShenFa=%.1f TiPo=%.1f"),
 			Data.GetJinLi(), Data.GetQiXue(), Data.GetNeiXi(), Data.GetShenFa(), Data.GetTiPo());
 		UE_LOG(LogTemp, Warning, TEXT("  Atk=%.0f HP=%.0f/%.0f MP=%.0f/%.0f"),
 			Data.GetAttackPower(), Attr->GetHealth(), Data.GetMaxHealth(), Attr->GetMana(), Data.GetMaxMana());

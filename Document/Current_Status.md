@@ -39,7 +39,7 @@
 
 ### 四十、伤害日志中文化 + 装备加成显示
 - **`MeleeSlashSkill.cpp`**：所有 UE_LOG 和屏幕 Debug 信息改为中文
-- **增加输出**：攻击方/防御方的装备五行加成（`装备加成[金+%d 木+%d ...]`）
+- **增加输出**：攻击方/防御方的装备五维加成（`装备加成[劲力+%d 气血+%d ...]`）
 
 ### 四十一、防御系统改为百分比减免
 - **`DamageCalculatorComponent.cpp`**：防御从固定减法改为 `Defense / (Defense + 100)` 百分比减免
@@ -179,7 +179,7 @@
 
 ### 六十一、物品数据表系统（4 表分离）
 - **新建 `Data/ItemDataTable.h`**：4 个独立行结构体
-  - `FEquipmentDataRow`：装备（EquipSlot / WeaponUsage / 五行加成等）
+  - `FEquipmentDataRow`：装备（EquipSlot / WeaponUsage / 五维加成等）
   - `FConsumableDataRow`：消耗品（EffectType / EffectValue）
   - `FMaterialDataRow`：材料（仅基础字段）
   - `FQuestItemDataRow`：任务物品（仅基础字段）
@@ -247,10 +247,9 @@
 
 ### 三十二、角色五维数据结构定义
 - **新增 `Data/CharacterData.h`**：`FCharacterCoreData` 结构体，包含：
-  - 五行根基值（金/木/水/火/土），可在蓝图编辑
-  - 五维属性计算（劲力=金+土×30%，气血=木+水×30%，内息=水+金×30%，身法=火+木×30%，体魄=土+火×30%）
+  - 五维基础属性（劲力/气血/内息/身法/体魄），可在蓝图编辑
   - 派生战斗属性（攻击力/最大血量/最大法力/生命恢复/法力恢复/防御/移速加成/闪避率/暴击率）含上限
-- **新增 `Data/DataDefinitions.h`**：`EWuXing` 五行枚举
+- **删除 `Data/DataDefinitions.h` 中的 `EWuXing` 五行枚举**（2026/08/20 已废弃五行概念）
 - **新增 `Data/` 目录**：后续装备/宝石/锻造数据均位于此
 - **改造 `AttributeComponent`**：移除硬编码的 `MaxHealth/MaxMana/BaseDamage/CritRate/Armor`，全部改为从 `FCharacterCoreData` 派生
 - **保留接口兼容**：`GetBaseDamage()`、`GetCritRate()`、`GetCritMultiplier()`、`GetArmor()`、`GetDamageReduction()` 接口不变，内部逻辑已切换
@@ -264,28 +263,27 @@
 
 ### 三十四、物品类体系 + 装备实装
 - **新增 `Data/ItemBase.h`**：`UItemBase` 物品基类（UObject，支持蓝图派生），包含ID/名称/描述/图标/堆叠上限
-- **新增 `Data/EquipItem.h/.cpp`**：`UEquipItem` 可装备物品，继承 `UItemBase`，包含槽位/武器类型/等级需求/五行加成（金木水火土各一个Bonus字段）
-- **新增 `Component/Equipment/EquipmentComponent.h/.cpp`**：装备管理组件，管理14槽位 TMap，支持 EquipItem/UnequipItem，自动处理双手武器锁定副手逻辑，装备/卸下时自动加减五行加成到 CharacterData
+- **新增 `Data/EquipItem.h/.cpp`**：`UEquipItem` 可装备物品，继承 `UItemBase`，包含槽位/武器类型/等级需求/五维加成（劲力/气血/内息/身法/体魄各一个Bonus字段）
+- **新增 `Component/Equipment/EquipmentComponent.h/.cpp`**：装备管理组件，管理14槽位 TMap，支持 EquipItem/UnequipItem，自动处理双手武器锁定副手逻辑，装备/卸下时自动加减五维加成到 CharacterData
 - **改造 `CharacterData.h`**：新增 `AddEquipmentBonus()` / `RemoveEquipmentBonus()` 接口
 - **改造 `BaseCharacter.h/.cpp`**：新增 `EquipmentComponent` 组件 + `GetEquipmentComponent()` 便捷接口
 
-### 三十五、伤害计算重构（五行生克 + 外伤/内伤）
-- **新增 `ESkillWuXing` 枚举**（金木水火土），用于技能配置五行属性
-- **新增 `SkillBase` 字段**：`SkillWuXing`（技能五行）+ `ExternalDamageRatio`（外伤占比）
-- **改造 `CharacterData.h`**：`GetDefense()` 拆分为 `GetExternalDefense()`（体魄+劲力）和 `GetInternalDefense()`（体魄+内息）；新增 `GetDominantWuXing()`（取最高五行作为目标属性）
-- **改造 `FDamageResult`**：新增 `WuXingMultiplier`、`ExternalDamage`、`InternalDamage`、`ExternalDefenseReduced`、`InternalDefenseReduced`
-- **重写 `CalculateDamage`**：完整链路为 基础伤害 → 五行生克(±30%) → 暴击 → 外伤/内伤拆分 → 外防/内防减免 → 百分比减伤 → 最终伤害
-- **五行相克查表**：静态函数 `GetWuXingMultiplier()`，使用 5×5 查表实现，攻方克守方×1.3，守方克攻方×0.7
-- **适配 `MeleeSlashSkill`**：`CalculateDamage` 调用传入 `SkillWuXing` 和 `ExternalDamageRatio`
+### 三十五、伤害计算重构（外伤/内伤）
+- **删除 `ESkillWuXing` 枚举和技能五行属性**（2026/08/20 已废弃五行相克概念）
+- **删除 `GetDominantWuXing()`**：不再需要取五行最高值作为目标属性
+- **改造 `FDamageResult`**：`ExternalDamage`、`InternalDamage`、`ExternalDefenseReduced`、`InternalDefenseReduced`
+- **重写 `CalculateDamage`**：完整链路为 基础伤害 → 暴击 → 外伤/内伤拆分 → 外防/内防减免 → 百分比减伤 → 最终伤害
+- **删除五行相克查表**：移除 `GetWuXingMultiplier()`（原攻方克守方×1.3，守方克攻方×0.7）
+- **适配 `MeleeSlashSkill`**：`CalculateDamage` 调用传入 `ExternalDamageRatio`
 - **移除旧接口**：`GetArmor()`、`GetDefense()` 已替换为 `GetExternalDefense()`/`GetInternalDefense()`
 
-### 三十六、技能五行属性移入技能阶段
-- **`FSkillStage` 新增字段**：`SkillWuXing`（阶段五行） + `ExternalDamageRatio`（外伤占比），每阶段可独立配置
+### 三十六、技能外伤占比移入技能阶段
+- **`FSkillStage` 新增字段**：`ExternalDamageRatio`（外伤占比），每阶段可独立配置
 - **`SkillBase` 移除字段**：`SkillWuXing`、`ExternalDamageRatio` 移到 `Stage` 中
-- **适配 `MeleeSlashSkill`**：读取 `Stage.SkillWuXing`、`Stage.ExternalDamageRatio`
+- **适配 `MeleeSlashSkill`**：读取 `Stage.ExternalDamageRatio`
 
 ### 三十七、调试日志系统
-- **基础属性日志**：`ABaseCharacter::BeginPlay()` 中使用 `UE_LOG` 输出角色名/五行/五维/派生属性，所有角色出生时自动打印
+- **基础属性日志**：`ABaseCharacter::BeginPlay()` 中使用 `UE_LOG` 输出角色名/五维/派生属性，所有角色出生时自动打印
 - **伤害分解日志**：`MeleeSlashSkill::ApplyDamage()` 中每条伤害信息同时通过 `UE_LOG`（终端）和 `AddOnScreenDebugMessage`（屏幕）输出
 
 ### 三十八、HP/MP 初始化修复

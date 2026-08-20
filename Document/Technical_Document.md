@@ -22,7 +22,7 @@ Moliser3sGameClient/Source/
 ├── Component/
 │   ├── Attribute/AttributeComponent.h/.cpp  # 属性组件
 │   ├── Damage/DamageCalculatorComponent.h/.cpp # 伤害计算
-│   ├── Equipment/EquipmentComponent.h/.cpp  # 装备管理（14槽位+五行加成）
+│   ├── Equipment/EquipmentComponent.h/.cpp  # 装备管理（14槽位+五维加成）
 │   ├── Facing/FacingComponent.h/.cpp        # 朝向控制组件
 │   ├── Input/ClickDetectionComponent.h/.cpp # 点击检测组件
 │   ├── Inventory/
@@ -38,11 +38,11 @@ Moliser3sGameClient/Source/
 │   ├── MeleeSlashSkill.h/.cpp               # 扇形斩击技能
 │   └── JumpSkill.h/.cpp                     # 跳跃技能 (抛物线位移)
 ├── Data/
-│   ├── CharacterData.h                      # 角色核心数据（五行→五维→派生）
-│   ├── DataDefinitions.h                    # 公共枚举（EWuXing/ESkillWuXing）
+│   ├── CharacterData.h                      # 角色核心数据（五维→派生）
+│   ├── DataDefinitions.h                    # 公共枚举（EItemCategory）
 │   ├── EquipmentData.h                      # 装备/武器/稀有度枚举
 │   ├── ItemBase.h                           # 物品基类（Use+WorldMesh+Icon缓存）
-│   ├── EquipItem.h/.cpp                     # 可装备物品（五行加成）
+│   ├── EquipItem.h/.cpp                     # 可装备物品（五维加成）
 │   └── ConsumableItem.h/.cpp                # 消耗品基类（回血/回蓝/增益）
 ├── UI/
 │   └── ItemDragDropOperation.h              # 拖拽操作数据（ESlotContainerType + 来源信息）
@@ -103,7 +103,7 @@ Build.bat Moliser3sGameClientEditor Win64 Development -Project="项目路径\Mol
 |------|---------|------|
 | `UAttributeComponent` | 角色 | 血量/法力/攻击/防御属性 |
 | `UDamageCalculatorComponent` | 角色 | 最终伤害计算（含暴击、防御减免） |
-| `UEquipmentComponent` | 角色 | 装备管理（14槽位+双手武器锁定+五行加成应用） |
+| `UEquipmentComponent` | 角色 | 装备管理（14槽位+双手武器锁定+五维加成应用） |
 | `UInventoryComponent` | 角色 | 背包（30格+数量管理+堆叠/拆分+拾取/丢弃/使用+事件广播，纯数据组件，无Tick） |
 | `UQuickSlotComponent` | 玩家 | 快捷栏（10格+数量管理+堆叠/拆分+背包交换+数字键触发） |
 | `UFacingComponent` | 玩家 | Walking/Aiming 两种朝向模式 |
@@ -221,6 +221,8 @@ struct FSkillStage
     float BaseDamage          // 基础伤害
     float HalfAngleDeg        // 扇形半角
     float MaxZDiff            // 最大高度差
+    float SkillRange          // 技能范围
+    float ExternalDamageRatio // 外伤占比（0~1，剩余为内伤）
 };
 ```
 
@@ -462,6 +464,8 @@ Tick (每帧):
 | `BaseDamage` | 基础伤害 | 该阶段伤害值 |
 | `HalfAngleDeg` | 扇形半角 | 扇形检测角度 |
 | `MaxZDiff` | 最大高度差 | 高度容差 |
+| `SkillRange` | 技能范围 | 该阶段球形检测半径 |
+| `ExternalDamageRatio` | 外伤占比 | 外伤/内伤拆分比例 |
 
 ### 8.3 战斗感知范围
 
@@ -617,3 +621,4 @@ WBP_QuickSlot.OnDragDetected
 | 06/25 | **[清理] 过量Debug日志**：移除背包/快捷栏/Controller信息性日志 | InventoryComponent, QuickSlotComponent, WorldPlayerController |
 | 07/16 | **[新增] UPathDisplayComponent**：路径表现组件，Catmull-Rom 样条平滑路径 + StepSubdivision 细分 + 连续 UV 映射 + 交替三角形绕序 + 终点标记 | Component/PathDisplay/* |
 | 07/16 | **[新增] ProceduralMeshComponent**：启用插件 + 模块依赖 | .uproject, Build.cs |
+| 08/20 | **[重构] 废弃五行概念**：删除 EWuXing/ESkillWuXing 枚举、五行相克伤害、五行根基值；五行根基值改为五维直接可配置（float），装备改为五维加成 | CharacterData.h, DataDefinitions.h, SkillTypes.h, DamageCalculatorComponent.*, EquipItem.h, ItemDataTable.h, EquipmentComponent.*, ItemFactory.cpp, MeleeSlashSkill.cpp, BaseCharacter.cpp |

@@ -308,22 +308,6 @@ TArray<EEquipmentSlot> UEquipmentComponent::GetOccupiedSlots() const
 	return Occupied;
 }
 
-void UEquipmentComponent::GetTotalWuXingBonuses(int32& OutJin, int32& OutMu, int32& OutShui, int32& OutHuo, int32& OutTu) const
-{
-	OutJin = OutMu = OutShui = OutHuo = OutTu = 0;
-	for (const auto& Pair : EquippedItems)
-	{
-		if (Pair.Value)
-		{
-			OutJin  += Pair.Value->JinBonus;
-			OutMu   += Pair.Value->MuBonus;
-			OutShui += Pair.Value->ShuiBonus;
-			OutHuo  += Pair.Value->HuoBonus;
-			OutTu   += Pair.Value->TuBonus;
-		}
-	}
-}
-
 void UEquipmentComponent::ApplyItemBonuses(UEquipItem* Item)
 {
 	if (!Item) return;
@@ -331,7 +315,7 @@ void UEquipmentComponent::ApplyItemBonuses(UEquipItem* Item)
 	if (!AttrComp) return;
 
 	FCharacterCoreData Data = AttrComp->GetCharacterData();
-	Data.AddEquipmentBonus(Item->JinBonus, Item->MuBonus, Item->ShuiBonus, Item->HuoBonus, Item->TuBonus);
+	Data.AddEquipmentBonus(Item->JinLiBonus, Item->QiXueBonus, Item->NeiXiBonus, Item->ShenFaBonus, Item->TiPoBonus);
 	AttrComp->SetCharacterData(Data);
 }
 
@@ -342,7 +326,7 @@ void UEquipmentComponent::RemoveItemBonuses(UEquipItem* Item)
 	if (!AttrComp) return;
 
 	FCharacterCoreData Data = AttrComp->GetCharacterData();
-	Data.RemoveEquipmentBonus(Item->JinBonus, Item->MuBonus, Item->ShuiBonus, Item->HuoBonus, Item->TuBonus);
+	Data.RemoveEquipmentBonus(Item->JinLiBonus, Item->QiXueBonus, Item->NeiXiBonus, Item->ShenFaBonus, Item->TiPoBonus);
 	AttrComp->SetCharacterData(Data);
 }
 

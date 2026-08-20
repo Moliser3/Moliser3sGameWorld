@@ -52,9 +52,6 @@ public:
 	UFUNCTION(BlueprintPure, Category = "装备")
 	TArray<EEquipmentSlot> GetOccupiedSlots() const;
 
-	UFUNCTION(BlueprintPure, Category = "装备")
-	void GetTotalWuXingBonuses(int32& OutJin, int32& OutMu, int32& OutShui, int32& OutHuo, int32& OutTu) const;
-
 	void MoveEquippedItem(EEquipmentSlot From, EEquipmentSlot To);
 
 	UPROPERTY(BlueprintAssignable, Category = "装备")

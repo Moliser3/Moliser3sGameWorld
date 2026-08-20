@@ -10,7 +10,6 @@ UDamageCalculatorComponent::UDamageCalculatorComponent()
 FDamageResult UDamageCalculatorComponent::CalculateDamage(
 	UAttributeComponent* TargetAttribute,
 	float BaseOverride,
-	ESkillWuXing SkillWuXing,
 	float ExternalDamageRatio) const
 {
 	FDamageResult Result;
@@ -38,25 +37,20 @@ FDamageResult UDamageCalculatorComponent::CalculateDamage(
 	float BaseDamage = AttackPower * SkillMultiplier;
 	Result.RawDamage = BaseDamage;
 
-	// Step2：五行相克计算
-	EWuXing TargetWuXing = TargetAttribute->GetCharacterData().GetDominantWuXing();
-	float WuXingMult = GetWuXingMultiplier(SkillWuXing, TargetWuXing);
-	Result.WuXingMultiplier = WuXingMult;
-	float AfterWuXing = BaseDamage * WuXingMult;
-
-	// Step3：暴击判定
+	// Step2：暴击判定
 	float CritValue = FMath::FRand();
+	float AfterCrit = BaseDamage;
 	if (CritValue <= MyAttribute->GetCritRate())
 	{
 		Result.bCrit = true;
-		AfterWuXing *= MyAttribute->GetCritMultiplier();
+		AfterCrit = BaseDamage * MyAttribute->GetCritMultiplier();
 	}
 
-	// Step4：拆分外伤/内伤
-	float RawExternal = AfterWuXing * ExternalDamageRatio;
-	float RawInternal = AfterWuXing * (1.0f - ExternalDamageRatio);
+	// Step3：拆分外伤/内伤
+	float RawExternal = AfterCrit * ExternalDamageRatio;
+	float RawInternal = AfterCrit * (1.0f - ExternalDamageRatio);
 
-	// Step5：防御减免（百分比）
+	// Step4：防御减免（百分比）
 	static const float DefenseConstant = 100.0f;
 
 	float ExternalDef = TargetAttribute->GetExternalDefense();
@@ -71,7 +65,7 @@ FDamageResult UDamageCalculatorComponent::CalculateDamage(
 	Result.ExternalDefenseReduced = RawExternal * ExternalDefRate;
 	Result.InternalDefenseReduced = RawInternal * InternalDefRate;
 
-	// Step6：百分比伤害减免
+	// Step5：百分比伤害减免
 	float Reduction = TargetAttribute->GetDamageReduction();
 	Result.ExternalDamage = ExternalAfterDef * (1.0f - Reduction);
 	Result.InternalDamage = InternalAfterDef * (1.0f - Reduction);
@@ -81,35 +75,4 @@ FDamageResult UDamageCalculatorComponent::CalculateDamage(
 	Result.FinalDamage = FMath::Max(1.0f, FMath::FloorToFloat(Total));
 
 	return Result;
-}
-
-float UDamageCalculatorComponent::GetWuXingMultiplier(ESkillWuXing AttackWuXing, EWuXing DefenseWuXing)
-{
-	// 相克表 [攻方][守方]: true = 攻方克守方
-	static const bool KeTable[5][5] = {
-		// Jin    Mu     Shui   Huo    Tu
-		{ false, true,  false, false, false },  // Jin 克 Mu
-		{ false, false, false, false, true  },  // Mu 克 Tu
-		{ false, false, false, true,  false },  // Shui 克 Huo
-		{ true,  false, false, false, false },  // Huo 克 Jin
-		{ false, false, true,  false, false },  // Tu 克 Shui
-	};
-
-	int32 AttackIdx = static_cast<int32>(AttackWuXing);
-	int32 DefenseIdx = static_cast<int32>(DefenseWuXing);
-
-	if (AttackIdx < 0 || AttackIdx > 4 || DefenseIdx < 0 || DefenseIdx > 4)
-	{
-		return 1.0f;
-	}
-
-	if (KeTable[AttackIdx][DefenseIdx])
-	{
-		return 1.3f;  // 攻方克守方
-	}
-	if (KeTable[DefenseIdx][AttackIdx])
-	{
-		return 0.7f;  // 守方克攻方
-	}
-	return 1.0f;  // 无关
 }
