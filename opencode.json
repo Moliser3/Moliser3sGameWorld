@@ -6,5 +6,8 @@
       "url": "http://localhost:8001/mcp",
       "enabled": true
     }
+  },
+  "skills": {
+    "paths": ["./Moliser3sGameClient/Skills"]
   }
 }
